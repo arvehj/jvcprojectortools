@@ -240,7 +240,7 @@ def gamma_menu():
                 else:
                     white = peak_white_normal
                 continue
-            table = ( '', get_gamma(bmax=float(input('max brightness: ')),
+            table = ( '', get_gamma(bmax=float(input('max brightness: '))*100/float(input('reference white (e.g. 100): ')),
                                     bsoftclip=float(input('soft clip start brightness: ')),
                                     bhardclip=float(input('hard clip brightness: ')),
                                     end_slope=float(input('clip end slope [0.0-1.0]: ')),
