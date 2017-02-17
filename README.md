@@ -1,4 +1,4 @@
-# JVC Projector Tools
+﻿# JVC Projector Tools
 
 Scripts to send commands 2015 model JVC D-ILA Projectors.
 
@@ -17,6 +17,6 @@ Run to get a menu that lets you generate and load custom gamma curves. Or call l
 - "hard clip brightness" is where the soft clip curve ends.
 - "clip end slope" moves the angle of the curve at the end point from horizontal (1) to pointing at the soft clip start point (0).
 - "soft clip method" selects between a cubic Bézier curve (0) and quadratic Bézier curve (1).
-- "soft clip gamma" selects the gamma to draw the soft clip curve in, but does not currently work correctly to it is best to leave it at 1.
+- "soft clip gamma" selects the gamma to draw the soft clip curve in.
 
 The generated gamma curves currently expects the projector to be configured to super-white

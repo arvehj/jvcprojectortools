@@ -31,7 +31,7 @@ def get_gamma(bmax=200, bsoftclip=150, bhardclip=10000, end_slope=0.99, clip=0, 
     lscale = eotf.peak / bmax
     lsoftclip = bsoftclip / bmax
     lhardclip = bhardclip / bmax
-    end_slope = lsoftclip + (1 - lsoftclip) * end_slope
+    end_slope = lsoftclip ** (1 / clip_gamma) + (1 - lsoftclip ** (1 / clip_gamma)) * end_slope
 
     if clip == 1:
         def B(t, P0, P1, Pignore, P2):
@@ -43,16 +43,17 @@ def get_gamma(bmax=200, bsoftclip=150, bhardclip=10000, end_slope=0.99, clip=0, 
     def clip(p, l, clip_p, clip_l, clip_gain, ppeak):
         if (l < lsoftclip):
             return l
-        o = l ** (1 / clip_gamma)
         clip_o = clip_l ** (1 / clip_gamma)
         dp = p - clip_p
         t = dp / (255 / white - clip_p)
         Btp = 0
         tl = 0
         th = 1
-        sat_p = clip_p + (end_slope - clip_o) / clip_gain
+        sat_o = end_slope
+        sat_p = clip_p + (sat_o - clip_o) / clip_gain
         if sat_p > ppeak:
-            return l
+            sat_p = ppeak
+            sat_o = (sat_p - clip_p) * clip_gain + clip_o
 
         while th - tl > 0.00001:
             Btp = B(t, clip_p, sat_p, sat_p, ppeak)
@@ -61,7 +62,7 @@ def get_gamma(bmax=200, bsoftclip=150, bhardclip=10000, end_slope=0.99, clip=0, 
             else:
                 th = t
             t = tl + (th - tl) / 2
-        Btl = B(t, clip_o, end_slope, end_slope, 1)
+        Btl = B(t, clip_o, sat_o, sat_o, 1)
         if debug > 2:
             print('{:3.0f}: p {:7.4f}, Btp {:7.4f}, t {:7.4f}, Bt {:7.4f}, clip_p {:7.4f}, sat_p {:7.4f}, clip_l {:7.4f}, clip_gain {:7.4f}'.format(
               p*white, p, Btp, t, Btl, clip_p, sat_p, clip_l, clip_gain))
@@ -79,7 +80,7 @@ def get_gamma(bmax=200, bsoftclip=150, bhardclip=10000, end_slope=0.99, clip=0, 
         if l >= lsoftclip and clip_p is None and last_p is not None:
             clip_p = last_p
             clip_l = last_l
-            clip_gain = (l - last_l) / (p - last_p)
+            clip_gain = (l ** (1 / clip_gamma) - last_l ** (1 / clip_gamma)) / (p - last_p)
         if l >= lhardclip:
             hardclip_p = p
             break;
@@ -233,7 +234,7 @@ def gamma_menu():
                                     bhardclip=float(input('hard clip brightness: ')),
                                     end_slope=float(input('clip end slope [0.0-1.0]: ')),
                                     clip=int(input('soft clip method [0,1]: ')),
-                                    clip_gamma=float(input('soft clip gamma <0.0-1.0]: ')),
+                                    clip_gamma=float(input('soft clip gamma (e.g. 1): ')),
                                     eotf=eotf.eotf_pq))
 
         if strtobool(input('Plot ' + table[0] + '? ')):
