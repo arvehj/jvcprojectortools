@@ -19,4 +19,4 @@ Run to get a menu that lets you generate and load custom gamma curves. Or call l
 - "soft clip method" selects between a cubic Bézier curve (0) and quadratic Bézier curve (1).
 - "soft clip gamma" selects the gamma to draw the soft clip curve in.
 
-The generated gamma curves currently expects the projector to be configured to super-white
+Select toggle white in the menu to match the input level setting in the projector settings you plan to use.

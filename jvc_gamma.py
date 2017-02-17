@@ -11,8 +11,9 @@ import dumpdata
 import eotf
 from jvc_command import JVCCommand, CommandNack, Command, PictureMode, GammaTable, GammaCorrection
 
-#white = 255 # normal/enhanced
-white = (235 - 16) * (255 / (255 - 16)) # super white
+peak_white_normal = 255 # normal/enhanced
+peak_white_super_white = (235 - 16) * (255 / (255 - 16)) # super white
+white = peak_white_super_white
 
 def oscale(l):
     oscale1 = 1023
@@ -28,6 +29,7 @@ def oscale(l):
     return oi
 
 def get_gamma(bmax=200, bsoftclip=150, bhardclip=10000, end_slope=0.99, clip=0, clip_gamma=1, eotf=eotf.eotf_pq, debug=0):
+    global white
     lscale = eotf.peak / bmax
     lsoftclip = bsoftclip / bmax
     lhardclip = bhardclip / bmax
@@ -41,6 +43,7 @@ def get_gamma(bmax=200, bsoftclip=150, bhardclip=10000, end_slope=0.99, clip=0, 
             return (1-t)**3*P0 + 3*(1-t)**2*t*P1 + 3*(1-t)*t**2*P2+t**3*P3
 
     def clip(p, l, clip_p, clip_l, clip_gain, ppeak):
+        global white
         if (l < lsoftclip):
             return l
         clip_o = clip_l ** (1 / clip_gamma)
@@ -210,25 +213,33 @@ def test_read_gamma():
 
 def gamma_menu():
     """JVC gamma table select, plot, load menu"""
+    global white
     while True:
         tables = [
-            ('Done', None),
-            ('bt1886', get_gamma(115, 100, end_slope=.98, eotf=eotf.eotf_bt1886)),
+            ('Done', None, 0),
+            ('toggle white (current %s)' % ('normal' if white == peak_white_normal else 'super white'), None, 1),
+            ('bt1886', get_gamma(100 if white == peak_white_normal else 115, 100, end_slope=.98, eotf=eotf.eotf_bt1886)),
             ('hdr_pq 250 sc200', get_gamma(250, 200, end_slope=1, eotf=eotf.eotf_pq)),
             ('hdr_pq 250 sc150', get_gamma(250, 150, end_slope=1, eotf=eotf.eotf_pq)),
             ('hdr_pq 500 sc300', get_gamma(500, 300, end_slope=1, eotf=eotf.eotf_pq)),
             ('hdr_pq 1000 sc600', get_gamma(1000, 600, end_slope=1, eotf=eotf.eotf_pq)),
             ('hdr_hlg 250 sc200', get_gamma(250, 200, end_slope=1, eotf=eotf.eotf_hlg)),
-            ('custom hdr_pq', None),
+            ('custom hdr_pq', None, 2),
             ]
 
         for i,table in enumerate(tables):
             print(i, table[0])
         i = int(input('Select gamma table: '))
-        if not i:
-            break
         table = tables[i]
         if not table[1]:
+            if table[2] == 0:
+                break
+            if table[2] == 1:
+                if white == peak_white_normal:
+                    white = peak_white_super_white
+                else:
+                    white = peak_white_normal
+                continue
             table = ( '', get_gamma(bmax=float(input('max brightness: ')),
                                     bsoftclip=float(input('soft clip start brightness: ')),
                                     bhardclip=float(input('hard clip brightness: ')),
