@@ -126,15 +126,23 @@ def load_gamma(*newgamma):
             assert gamma_correction is GammaCorrection.Import, \
                 'Correction value for %s is not set to import, %s' % (old_gamma_table, gamma_correction)
 
+            input('Press enter to load red gamma table: ')
             jvc.set_gamma(Command.gammared, newgamma[0])
+            input('Press enter to read back red gamma table: ')
             gamma_red = jvc.get_gamma(Command.gammared)
             if gamma_red != newgamma[0]:
                 print('Failed to verify red gamma table')
+
+            input('Press enter to load green gamma table: ')
             jvc.set_gamma(Command.gammagreen, newgamma[1])
+            input('Press enter to read back green gamma table: ')
             gamma_green = jvc.get_gamma(Command.gammagreen)
             if gamma_green != newgamma[1]:
                 print('Failed to verify green gamma table')
+
+            input('Press enter to load blue gamma table: ')
             jvc.set_gamma(Command.gammablue, newgamma[2])
+            input('Press enter to read back blue gamma table: ')
             gamma_blue = jvc.get_gamma(Command.gammablue)
             if gamma_blue != newgamma[2]:
                 print('Failed to verify blue gamma table')
