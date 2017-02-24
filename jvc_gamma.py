@@ -113,7 +113,7 @@ def load_gamma(*newgamma):
     if len(newgamma) == 1:
         newgamma = newgamma * 3
     assert len(newgamma) == 3
-    with JVCCommand(print_all=False) as jvc:
+    with JVCCommand(print_all=True) as jvc:
         try:
             print('Picture mode:', jvc.get_picture_mode())
             old_gamma_table = jvc.get_gamma_table()
