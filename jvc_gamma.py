@@ -16,7 +16,7 @@ peak_white_super_white = (235 - 16) * (255 / (255 - 16)) # super white
 white = peak_white_super_white
 
 def oscale(l):
-    oscale1 = 255
+    oscale1 = 1023
     out_gamma = 1/2.2
     oscale = oscale1
     if l < 0:
