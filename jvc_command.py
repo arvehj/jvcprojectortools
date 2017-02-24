@@ -3,6 +3,7 @@
 """JVC projector low level command module"""
 
 from enum import Enum
+import traceback
 
 import dumpdata
 import jvc_protocol
@@ -486,16 +487,21 @@ def main():
             except jvc_protocol.CommandNack:
                 print('Failed to get/set input')
 
-            print(jvc.get_info_input())
-            print('Source:', jvc.get_info_source())
-            print('Deep Color:', jvc.get_info_deep_color())
-            print('Color Space:', jvc.get_info_color_space())
+            try:
+                print(jvc.get_info_input())
+                print('Source:', jvc.get_info_source())
+                print('Deep Color:', jvc.get_info_deep_color())
+                print('Color Space:', jvc.get_info_color_space())
 
-            #jvc.send_remote_code(0x7374) #info
+                #jvc.send_remote_code(0x7374) #info
 
-            print(jvc.get_picture_mode())
-            print(jvc.get_gamma_table())
-            print(jvc.get_gamma_correction())
+                print(jvc.get_picture_mode())
+                print(jvc.get_gamma_table())
+                print(jvc.get_gamma_correction())
+            except:
+                print('a command failed:')
+                traceback.print_exc()
+
             try:
                 gamma_red = jvc.get_gamma(Command.gammared)
                 dumpdata.dumpdata('  Gamma Red:', '{:4d}', gamma_red, limit=16)
