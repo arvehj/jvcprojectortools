@@ -8,6 +8,37 @@ import dumpdata
 import jvc_protocol
 from jvc_protocol import CommandNack
 
+class ReadOnly():
+    """Common base class for read-only command arguments"""
+    pass
+
+class WriteOnly():
+    """Common base class for write-only command arguments"""
+    pass
+
+class BinaryData():
+    """Common base class for binary command arguments"""
+    pass
+
+class Model(ReadOnly, Enum):
+    """Projector model code"""
+    DLA_X550R_X5000_XC5890R_RS400 = b'ILAFPJ -- XHP1'
+    DLA_XC6890 = b'ILAFPJ -- XHP2'
+    DLA_X750R_X7000_XC7890R_RS500_X950R_X9000_RS600_PX1 = b'ILAFPJ -- XHP3'
+
+def s8_bytes_to_list(bstr):
+    """Convert 8bit signed bytes to list"""
+    return [b if b < 0x80 else b - 0x100 for b in bstr]
+
+def num_to_s8(num):
+    """Convert signed number to 8bit (unsigned)"""
+    assert -0x80 <= num < 0x80, '{} out of range'.format(num)
+    return num & 0xff
+
+def list_to_s8_bytes(numlist):
+    """Convert list of signed numbers to 8bit bytes"""
+    return bytes(num_to_s8(num) for num in numlist)
+
 def le16_bytes_to_list(bstr):
     """Convert 16bit little-endian bytes to list"""
     i = iter(bstr)
@@ -24,195 +55,70 @@ def list_to_le16_bytes(table):
     """Convert list to 16bit little-endian bytes"""
     return bytes(le16_split(table))
 
-class Command(Enum):
-    """Command codes"""
-    null = b'\0\0' # NULL command
-    power = b'PW'   # Power [PoWer]
-    input = b'IP'   # Input [InPut]
-    remote = b'RC'   # Remote control code through [Remote Code]
-    setup = b'SU'   # Initial setup [SetUp]
-    gammared = b'GR'   # Gamma data (Red) of the Gamma table ”Custom 1/2/3” [Gamma Red]
-    gammagreen = b'GG'   # Gamma data (Green) of the Gamma table ”Custom 1/2/3” [Gamma Green]
-    gammablue = b'GB'   # Gamma data (Blue) of the Gamma table ”Custom 1/2/3” [Gamma Blue]
-    panelalignred = b'PR'   # Red of Panel Alignment (zone)  
-    panelalignblue = b'PB'   # Blue of Panel Alignment (zone)  
-    sourceask = b'SC'   # Source asking [SourCe] - 
-    model = b'MD'   # Model status asking [MoDel] - 
+class Numeric(int):
+    """Signed 16 bit values as ascii hex data"""
+    def __new__(cls, value):
+        if isinstance(value, bytes):
+            assert len(value) == 4, '{} is not 4 bytes'.format(value)
+            cls.value = value
+        else:
+            assert -0x8000 <= value <= 0x7fff, '{} out of range'.format(value)
+            cls.value = bytes('{:04X}'.format(value & 0xffff), 'ascii')
+        num = int(cls.value, 16)
+        if num & 0x8000:
+            num = num - 0x10000
+        return super(Numeric, cls).__new__(cls, num)
 
-    # Picture adjustment [adjustment of Picture] : Picture Adjust  
-    PictureMode = b'PMPM' # Picture Mode switch
-    ClearBlack = b'PMAN' # Clear Black
-    IntelligentLensAperture = b'PMDI' # Intelligent Lens Aperture
-    ColorProfile = b'PMPR' # Color Profile switch (*1)
-    ColorTemperatureTable = b'PMCL' # Color Temperature table switch
-    ColorTemperatureCorrection = b'PMCC' # Color Temperature Correction switch
-    ColorTemperatureGainRed = b'PMGR' # Color Temperature Gain (Red) adjustment
-    ColorTemperatureGainGreen = b'PMGG' # Color Temperature Gain (Green) adjustment
-    ColorTemperatureGainBlue = b'PMGB' # Color Temperature Gain (Blue) adjustment
-    ColorTemperatureOffsetRed = b'PMOR' # Color Temperature Offset (Red) adjustment
-    ColorTemperatureOffsetGreen = b'PMOG' # Color Temperature Offset (Green) adjustment
-    ColorTemperatureOffsetBlue = b'PMOB' # Color Temperature Offset (Blue) adjustment
-    GammaTable = b'PMGT' # Gamma Table switch
-    PictureToneWhite = b'PMFW' # Picture Tone (White) adjustment
-    PictureToneRed = b'PMFR' # Picture Tone (Red) adjustment
-    PictureToneGreen = b'PMFG' # Picture Tone (Green) adjustment
-    PictureToneBlue = b'PMFB' # Picture Tone (Blue) adjustment
-    Contrast = b'PMCN' # Contrast adjustment
-    Brightness = b'PMBR' # Brightness adjustment
-    Color = b'PMCO' # Color adjustment
-    Tint = b'PMTI' # Tint adjustment
-    NoiseReduction = b'PMRN' # NR adjustment
-    GammaCorrection = b'PMGC' # Gamma Correction switch
-    GammaRed = b'PMDR' # Gamma Red data
-    GammaGreen = b'PMDG' # Gamma Green data
-    GammaBlue = b'PMDB' # Gamma Blue data
-    BrightLevelWhite = b'PMRW' # Bright Level White
-    BrightLevelRed = b'PMRR' # Bright Level Red
-    BrightLevelGreen = b'PMRG' # Bright Level Green
-    BrightLevelBlue = b'PMRB' # Bright Level Blue
-    DarkLevelWhite = b'PMKW' # Dark Level White
-    DarkLevelRed = b'PMKR' # Dark Level Red
-    DarkLevelGreen = b'PMKG' # Dark Level Green
-    DarkLevelBlue = b'PMKB' # Dark Level Blue
-    ColorManagementTable = b'PMCB' # Color Management table
-    AxisPositionRed = b'PMAR' # Axis Position (Red) adjustment
-    AxisPositionYellow = b'PMAY' # Axis Position (Yellow) adjustment
-    AxisPositionGreen = b'PMAG' # Axis Position (Green) adjustment
-    AxisPositionCyan = b'PMAC' # Axis Position (Cyan) adjustment
-    AxisPositionBlue = b'PMAB' # Axis Position (Blue) adjustment
-    AxisPositionMagenta = b'PMAM' # Axis Position (Magenta) adjustment
-    HUERed = b'PMHR' # HUE (Red) adjustment
-    HUEYellow = b'PMHY' # HUE (Yellow) adjustment
-    HUEGreen = b'PMHG' # HUE (Green) adjustment
-    HUECyan = b'PMHC' # HUE (Cyan) adjustment
-    HUEBlue = b'PMHB' # HUE (Blue) adjustment
-    HUEMagenta = b'PMHM' # HUE (Magenta) adjustment
-    SATURATIONRed = b'PMSR' # SATURATION (Red) adjustment
-    SATURATIONYellow = b'PMSY' # SATURATION (Yellow) adjustment
-    SATURATIONGreen = b'PMSG' # SATURATION (Green) adjustment
-    SATURATIONCyan = b'PMSC' # SATURATION (Cyan) adjustment
-    SATURATIONBlue = b'PMSB' # SATURATION (Blue) adjustment
-    SATURATIONMagenta = b'PMSM' # SATURATION (Magenta) adjustment
-    BRIGHTNESSRed = b'PMLR' # BRIGHTNESS (Red) adjustment
-    BRIGHTNESSYellow = b'PMLY' # BRIGHTNESS (Yellow) adjustment
-    BRIGHTNESSGreen = b'PMLG' # BRIGHTNESS (Green) adjustment
-    BRIGHTNESSCyan = b'PMLC' # BRIGHTNESS (Cyan) adjustment
-    BRIGHTNESSBlue = b'PMLB' # BRIGHTNESS (Blue) adjustment
-    BRIGHTNESSMagenta = b'PMLM' # BRIGHTNESS (Magenta) adjustment
-    ClearMotionDrive = b'PMCM' # Clear Motion Drive
-    MotionEnhance = b'PMME' # Motion Enhance
-    LensAperture = b'PMLA' # Lens Aperture
-    LampPower = b'PMLP' # Lamp Power
-    MPCAnalyze = b'PMMA' # MPC Analyze
-    EShift4K = b'PMUS' # 4K e-shift
-    OriginalResolution = b'PMRP' # Original Resolution
-    Enhance = b'PMEN' # Enhance
-    DynamicContrast = b'PMDY' # Dynamic Contrast
-    Smoothing = b'PMST' # Smoothing
-    NameEditofPictureModeUser1 = b'PMU1' # Name Edit of Picture Mode User1
-    NameEditofPictureModeUser2 = b'PMU2' # Name Edit of Picture Mode User2
-    NameEditofPictureModeUser3 = b'PMU3' # Name Edit of Picture Mode User3
-    NameEditofPictureModeUser4 = b'PMU4' # Name Edit of Picture Mode User4
-    NameEditofPictureModeUser5 = b'PMU5' # Name Edit of Picture Mode User5
-    NameEditofPictureModeUser6 = b'PMU6' # Name Edit of Picture Mode User6
+class NumericReadOnly(ReadOnly, Numeric):
+    """Read only numeric value"""
+    pass
 
-    # Picture adjustment [adjustment of Picture] : Input Signal  
-    HDMIInputLevel = b'ISIL' # HDMI Input Level switch
-    HDMIColorSpace = b'ISHS' # HDMI Color Space switch
-    HDMI2D3D = b'IS3D' # HDMI 2D/3D switch
-    HDMI3DPhase = b'IS3P' # HDMI 3D Phase adjustment
-    PicturePositionHorizontal = b'ISPH' # Picture Position (Horizontal) adjustment
-    PicturePositionVertical = b'ISPV' # Picture Position (Vertical) adjustment
-    Aspect = b'ISAS' # Aspect switch
-    Mask = b'ISMA' # Mask switch
-    MaskLeft = b'ISML' # Mask (Left) adjustment
-    MaskRight = b'ISMR' # Mask (Right) adjustment
-    MaskTop = b'ISMT' # Mask (Top) adjustment
-    MaskBottom = b'ISMB' # Mask (Bottom) adjustment
-    FilmMode = b'ISFM' # Film Mode switch
-    Parallaxof3Dconversion = b'ISLV' # Parallax of 3D conversion adjustment
-    CrosstalkCancelWhite = b'ISCA' # Crosstalk Cancel (White) adjustment
+class CustomGammaTable(BinaryData, list):
+    """Custom gamma table data"""
+    def __init__(self, value):
+        if isinstance(value, bytes):
+            assert len(value) == 512, '{} is not 512 bytes'.format(value)
+            self.value = value
+        else:
+            assert len(value) == 256, '{} does not have 256 entries'.format(value)
+            self.value = list_to_le16_bytes(value)
 
-    # Picture adjustment [adjustment of Picture] : Installation  
-    FocusNear = b'INFN' # Focus Near adjustment (*3)
-    FocusFar = b'INFF' # Focus Far adjustment (*3)
-    ZoomTele = b'INZT' # Zoom Tele adjustment (*3)
-    ZoomWide = b'INZW' # Zoom Wide adjustment (*3)
-    ShiftLeft = b'INSL' # Shift Left adjustment (*3)
-    ShiftRight = b'INSR' # Shift Right adjustment (*3)
-    ShiftUp = b'INSU' # Shift Up adjustment (*3)
-    ShiftDown = b'INSD' # Shift Down adjustment (*3)
-    LensCover = b'INCV' # Lens Cover switch
-    ImagePattern = b'INIP' # Image Pattern switch
-    LensLock = b'INLL' # Lens Lock switch
-    PixelAdjustHorizontalRed = b'INXR' # Pixel Adjust (Horizontal Red) adjustment
-    PixelAdjustHorizontalBlue = b'INXB' # Pixel Adjust (Horizontal Blue) adjustment
-    PixelAdjustVerticalRed = b'INYR' # Pixel Adjust (Vertical Red) adjustment
-    PixelAdjustVerticalBlue = b'INYB' # Pixel Adjust (Vertical Blue) adjustment
-    InstallationStyle = b'INIS' # Installation Style switch
-    KeystoneVertical = b'INKV' # Keystone (Vertical) adjustment
-    Anamorphic = b'INVS' # Anamorphic switch
-    ScreenAdjustData = b'INSA' # Screen Adjust Data
-    ScreenAdjust = b'INSC' # Screen Adjust switch
-    PanelAlignment = b'INPA' # Panel Alignment switch
-    StoreLensmemory = b'INMS' # Store Lens memory
-    LoadLensmemory = b'INML' # Load Lens memory
-    NameEditofLensMemory1 = b'INM1' # Name Edit of Lens Memory 1
-    NameEditofLensMemory2 = b'INM2' # Name Edit of Lens Memory 2
-    NameEditofLensMemory3 = b'INM3' # Name Edit of Lens Memory 3
-    NameEditofLensMemory4 = b'INM4' # Name Edit of Lens Memory 4
-    NameEditofLensMemory5 = b'INM5' # Name Edit of Lens Memory 5
-    NameEditofLensMemory6 = b'INM6' # Name Edit of Lens Memory 6
-    NameEditofLensMemory7 = b'INM7' # Name Edit of Lens Memory 7
-    NameEditofLensMemory8 = b'INM8' # Name Edit of Lens Memory 8
-    NameEditofLensMemory9 = b'INM9' # Name Edit of Lens Memory 9
-    NameEditofLensMemory10 = b'INMA' # Name Edit of Lens Memory 10
-    FocusNear1Shot = b'IN1N' # Focus Near adjustment (1 shot)(*3)
-    FocusFar1Shot = b'IN1F' # Focus Far adjustment (1 shot) (*3)
-    ZoomTele1Shot = b'IN1T' # Zoom Tele adjustment (1 shot) (*3)
-    ZoomWide1Shot = b'IN1W' # Zoom Wide adjustment (1 shot) (*3)
-    ShiftLeft1Shot = b'IN1L' # Shift Left adjustment (1 shot) (*3)
-    ShiftRight1Shot = b'IN1R' # Shift Right adjustment (1 shot) (*3)
-    ShiftUp1Shot = b'IN1U' # Shift Up adjustment (1 shot) (*3)
-    ShiftDown1Shot = b'IN1D' # Shift Down adjustment (1 shot) (*3)
-    HighAltitudeMode = b'INHA' # High Altitude mode switch
+        super(CustomGammaTable, self).__init__(le16_bytes_to_list(self.value))
 
-    # Picture adjustment [adjustment of Picture] : Display Setup  
-    BackColor = b'DSBC' # Back Color switch
-    MenuPosition = b'DSMP' # Menu Position switch
-    SourceDisplay = b'DSSD' # Source Display switch
-    Logo = b'DSLO' # Logo switch
-    Language = b'DSLA' # Language switch
+class PanelAlignment(BinaryData, list):
+    """Panel Alignment Data"""
+    def __init__(self, value):
+        if isinstance(value, bytes):
+            assert len(value) == 256, '{} is not 256 bytes'.format(value)
+            self.value = value
+        else:
+            assert len(value) == 256, '{} does not have 256 entries'.format(value)
+            self.value = list_to_s8_bytes(value)
 
-    # Picture adjustment [adjustment of Picture] : Function  
-    Trigger = b'FUTR' # Trigger switch
-    OffTimer = b'FUOT' # Off Timer switch
-    EcoMode = b'FUEM' # Eco Mode switch
-    Control4 = b'FUCF' # Control4
+        super(PanelAlignment, self).__init__(s8_bytes_to_list(self.value))
 
-    # Picture adjustment [adjustment of Picture] : Information - 
-    InfoInput = b'IFIN' # Input display
-    InfoSource = b'IFIS' # Source display
-    InfoHorizontalResolution = b'IFRH' # Horizontal Resolution display
-    InfoVerticalResolution = b'IFRV' # Vertical Resolution display
-    InfoHorizontalFrequency = b'IFFH' # Horizontal Frequency display (*4)
-    InfoVerticalFrequency = b'IFFV' # Vertical Frequency display (*4)
-    InfoDeepColor = b'IFDC' # Deep Color display
-    InfoColorSpace = b'IFXV' # Color space display
-    InfoLampTime = b'IFLT' # Lamp Time display
-    InfoSoftVersion = b'IFSV' # Soft Version Display
-    InfoCalibratorInformation = b'IFCI' # Calibrator Information transmission/display (*5)
+class SourceAsk(ReadOnly, Enum):
+    """Source Asking State"""
+    NoSignalOrOutOfRange = b'0'
+    SignalAvailable = b'1'
 
-    PMCalibratorInformation = b'PMCI' # Calibrator Information transmission/display (*5)
-    lansetup = b'LS'   # LAN setup [Lan Setup]
+class Null(WriteOnly, Enum):
+    """Null command arg"""
+    Null = b''
+
+class RemoteCode(WriteOnly, Enum):
+    """Remote codes"""
+    Back = b'7303'
+    Menu = b'732E'
+    PictureAdjust = b'7372'
 
 class PowerState(Enum):
     """Power state"""
-    StandBy = b'0'
-    LampOn = b'1'
-    Cooling = b'2'
-    Reserved = b'3'
-    Error = b'4'
+    StandBy = b'0' # send/get
+    LampOn = b'1' # send/get
+    Cooling = b'2' # get
+    Starting = b'3' # get
+    Error = b'4' # get
 
 class InputState(Enum):
     """Input state"""
@@ -272,6 +178,31 @@ class ColorProfile(Enum):
     Reference = b'21'
     Custom6 = b'22'
 
+class ColorTemperature(Enum):
+    """Color Temperature Setting"""
+    Temp5500K = b'0'
+    Temp6500K = b'2'
+    Temp7500K = b'4'
+    Temp9300K = b'8'
+    HighBright = b'9'
+    Custom1 = b'A'
+    Custom2 = b'B'
+    Custom3 = b'C'
+    Xenon1 = b'D'
+    Xenon2 = b'E'
+    Xenon3 = b'F'
+
+class ColorTemperatureCorrection(Enum):
+    """Color Temperature Correction Setting"""
+    Temp5500K = b'0'
+    Temp6500K = b'2'
+    Temp7500K = b'4'
+    Temp9300K = b'8'
+    HighBright = b'9'
+    Xenon1 = b'D'
+    Xenon2 = b'E'
+    Xenon3 = b'F'
+
 class GammaTable(Enum):
     """Gamma Table Setting"""
     Normal = b'0'
@@ -305,120 +236,66 @@ class GammaCorrection(Enum):
     Film2 = b'0F'
     GammaD = b'14'
 
-class JVCCommand:
-    """JVC projector low level command processing class"""
-    def __init__(self, print_cmd_send=False, print_cmd_res=False, print_all=False, **args):
-        self.print_cmd_send = print_cmd_send or print_all
-        self.print_cmd_res = print_cmd_res or print_all
-        self.print_cmd_bin_res = print_all
-        self.conn = jvc_protocol.JVCConnection(print_all=print_all, **args)
+class ColorManagement(Enum):
+    """Color Management Setting"""
+    Off = b'0'
+    On = b'1'
 
-    def __enter__(self):
-        self.conn.__enter__()
-        return self
+class ClearMotionDrive(Enum):
+    """Clear Motion Drive Setting"""
+    Off = b'0'
+    Low = b'3'
+    High = b'4'
+    InverseTelecine = b'5'
 
-    def __exit__(self, exception, value, traceback):
-        self.conn.__exit__(exception, value, traceback)
+class MotionEnhance(Enum):
+    """Motion Enhance Setting"""
+    Off = b'0'
+    Low = b'1'
+    High = b'2'
 
-    def cmd_op(self, cmd, arg=b'', **kwargs):
-        """Send operation command"""
-        self.conn.cmd_op(cmd.value+arg, **kwargs)
+class LampPower(Enum):
+    """Lamp Power Setting"""
+    Normal = b'0'
+    High = b'1'
 
-    def cmd_ref(self, cmd, arg=b'', **kwargs):
-        """Send reference command"""
-        return self.conn.cmd_ref(cmd.value+arg, **kwargs)
+class MPCAnalyze(Enum):
+    """MPC Analyze Mode"""
+    Off = b'0'
+    Analyze = b'1'
+    AnalyzeEnhance = b'2'
+    AnalyzeDynamicContrast = b'3'
+    AnalyzeSmoothing = b'4'
+    AnalyzeHistogram = b'5'
 
-    def cmd_ref_bin(self, cmd, arg=b'', **kwargs):
-        """Send reference command and retrieve binary response"""
-        return self.conn.cmd_ref_bin(cmd.value+arg, **kwargs)
+class EShift4K(Enum):
+    """4K e-shift Setting"""
+    Off = b'0'
+    On = b'1'
 
-    def null_op(self):
-        """Send null operation command"""
-        self.cmd_op(Command.null)
+class OriginalResolution(Enum):
+    """e-shift Original Resolution Setting"""
+    Auto = b'0'
+    Res1080P = '3'
+    Res4K = '4'
 
-    def set_power(self, power_on):
-        """Set Power State"""
-        self.cmd_op(Command.power, {False: b'0', True: b'1'}[power_on])
+class HDMIInputLevel(Enum):
+    """HDMI Input Level Setting"""
+    Standard = b'0' # 16-235
+    Enhanced = b'1' # 0-255
+    SuperWhite = b'2' # 16-255
+    Auto = b'3'
 
-    def get_power(self):
-        """Get Power State"""
-        res = self.cmd_ref(Command.power)
-        return PowerState(res)
+class HDMIColorSpace(Enum):
+    """HDMI Color Space Setting"""
+    Auto = b'0'
+    YCbCr444 = b'1'
+    YCbCr422 = b'2'
+    RGB = b'3'
 
-    def set_input(self, port):
-        """Select input"""
-        self.cmd_op(Command.input, port.value, acktimeout=10)
-
-    def get_input(self):
-        """Get Power State"""
-        res = self.cmd_ref(Command.input)
-        return InputState(res)
-
-    def send_remote_code(self, remote_code):
-        """Send remote code"""
-        self.cmd_op(Command.remote, bytes('{:04x}'.format(remote_code), 'ascii'))
-
-    #skip setup commands
-
-    def set_gamma(self, channel, table):
-        """Upload gamma table"""
-        assert channel in {Command.gammared,
-                           Command.gammagreen,
-                           Command.gammablue,
-                           Command.GammaRed,
-                           Command.GammaGreen,
-                           Command.GammaBlue,
-                          }
-        assert len(table) == 256
-        self.cmd_op(channel, sendrawdata=list_to_le16_bytes(table))
-
-    def get_gamma(self, channel):
-        """Read gamma table"""
-        assert channel in {Command.gammared,
-                           Command.gammagreen,
-                           Command.gammablue,
-                           Command.GammaRed,
-                           Command.GammaGreen,
-                           Command.GammaBlue,
-                          }
-        return le16_bytes_to_list(self.cmd_ref_bin(channel))
-
-    def get_model(self):
-        """Get model number"""
-        return self.cmd_ref(Command.model)
-
-    def set_picture_mode(self, mode):
-        """Get picture mode"""
-        assert isinstance(mode, PictureMode)
-        self.cmd_op(Command.PictureMode, mode.value, acktimeout=10)
-
-    def get_picture_mode(self):
-        """Get picture mode"""
-        return PictureMode(self.cmd_ref(Command.PictureMode))
-
-    def get_clear_black(self):
-        """Get Clear Black"""
-        return ClearBlack(self.cmd_ref(Command.ClearBlack))
-
-    def get_gamma_table(self):
-        """Get Gamma Table"""
-        return GammaTable(self.cmd_ref(Command.GammaTable))
-
-    def set_gamma_table(self, gamma_table):
-        """Set Gamma Table"""
-        assert isinstance(gamma_table, GammaTable)
-        self.cmd_op(Command.GammaTable, gamma_table.value, acktimeout=10)
-
-    def get_gamma_correction(self):
-        """Get Gamma Correction"""
-        return GammaCorrection(self.cmd_ref(Command.GammaCorrection))
-
-    def get_info_input(self):
-        """Get Info Input"""
-        return InputState(self.cmd_ref(Command.InfoInput))
-
-    def get_info_source(self):
-        """Get Info Source"""
+class SourceData(ReadOnly, str):
+    """Input Info Source Information"""
+    def __new__(cls, value):
         return {
             b'02': '480p',
             b'03': '576p',
@@ -443,64 +320,294 @@ class JVCCommand:
             b'17': '4K(3840)30',
             b'18': '4K(3840)25',
             b'19': '4K(3840)24',
-            }[self.cmd_ref(Command.InfoSource)]
+            }[value]
 
-    def get_info_deep_color(self):
-        """Get Info Deep Color"""
+class DeepColorData(ReadOnly, str):
+    """Input Info Deep Color"""
+    def __new__(cls, value):
         return {
             b'0': '8 bit',
             b'1': '10 bit',
             b'2': '12 bit',
-            }[self.cmd_ref(Command.InfoDeepColor)]
+            }[value]
 
-    def get_info_color_space(self):
-        """Get Info Color Space"""
+class ColorSpaceData(ReadOnly, str):
+    """Input Info Color Space"""
+    def __new__(cls, value):
         return {
             b'0': 'RGB',
             b'1': 'YUV',
             b'2': 'x.v.Color',
-            }[self.cmd_ref(Command.InfoColorSpace)]
+            }[value]
+
+class Command(Enum):
+    """Command codes (and return types)"""
+    Null = b'\0\0', Null # NULL command
+    Power = b'PW', PowerState # Power [PoWer]
+    Input = b'IP', InputState # Input [InPut]
+    Remote = b'RC', RemoteCode # Remote control code through [Remote Code]
+    SetupCom = b'SURS' # Initial setup [SetUp] external control compatible command protocol
+    SetupIR = b'SURC' # Initial setup [SetUp] IR code
+    GammaRed = b'GR', CustomGammaTable # Gamma data (Red) of the Gamma table ”Custom 1/2/3”
+    GammaGreen = b'GG', CustomGammaTable # Gamma data (Green) of the Gamma table ”Custom 1/2/3”
+    GammaBlue = b'GB', CustomGammaTable # Gamma data (Blue) of the Gamma table ”Custom 1/2/3”
+    PanelAlignRed = b'PR', PanelAlignment # Red of Panel Alignment (zone)
+    PanelAlignBlue = b'PB', PanelAlignment # Blue of Panel Alignment (zone)
+    SourceAsk = b'SC', SourceAsk # Source asking [SourCe]
+    Model = b'MD', Model   # Model status asking [MoDel]
+
+    # Picture adjustment [adjustment of Picture] : Picture Adjust
+    PictureMode = b'PMPM', PictureMode # Picture Mode switch
+    ClearBlack = b'PMAN', ClearBlack # Clear Black
+    IntelligentLensAperture = b'PMDI', IntelligentLensAperture # Intelligent Lens Aperture
+    ColorProfile = b'PMPR', ColorProfile # Color Profile switch (*1)
+    ColorTemperatureTable = b'PMCL', ColorTemperature # Color Temperature table
+    ColorTemperatureCorrection = b'PMCC', ColorTemperatureCorrection # Color Temperature Correction
+    ColorTemperatureGainRed = b'PMGR', Numeric # Color Temperature Gain (Red) adjustment
+    ColorTemperatureGainGreen = b'PMGG', Numeric # Color Temperature Gain (Green) adjustment
+    ColorTemperatureGainBlue = b'PMGB', Numeric # Color Temperature Gain (Blue) adjustment
+    ColorTemperatureOffsetRed = b'PMOR', Numeric # Color Temperature Offset (Red) adjustment
+    ColorTemperatureOffsetGreen = b'PMOG', Numeric # Color Temperature Offset (Green) adjustment
+    ColorTemperatureOffsetBlue = b'PMOB', Numeric # Color Temperature Offset (Blue) adjustment
+    GammaTable = b'PMGT', GammaTable # Gamma Table switch
+    PictureToneWhite = b'PMFW', Numeric # Picture Tone (White) adjustment
+    PictureToneRed = b'PMFR', Numeric # Picture Tone (Red) adjustment
+    PictureToneGreen = b'PMFG', Numeric # Picture Tone (Green) adjustment
+    PictureToneBlue = b'PMFB', Numeric # Picture Tone (Blue) adjustment
+    Contrast = b'PMCN', Numeric # Contrast adjustment
+    Brightness = b'PMBR', Numeric # Brightness adjustment
+    Color = b'PMCO', Numeric # Color adjustment
+    Tint = b'PMTI', Numeric # Tint adjustment
+    NoiseReduction = b'PMRN', Numeric # NR adjustment
+    GammaCorrection = b'PMGC', GammaCorrection # Gamma Correction switch
+    PMGammaRed = b'PMDR', CustomGammaTable # Gamma Red data
+    PMGammaGreen = b'PMDG', CustomGammaTable # Gamma Green data
+    PMGammaBlue = b'PMDB', CustomGammaTable # Gamma Blue data
+    BrightLevelWhite = b'PMRW', Numeric # Bright Level White
+    BrightLevelRed = b'PMRR', Numeric # Bright Level Red
+    BrightLevelGreen = b'PMRG', Numeric # Bright Level Green
+    BrightLevelBlue = b'PMRB', Numeric # Bright Level Blue
+    DarkLevelWhite = b'PMKW', Numeric # Dark Level White
+    DarkLevelRed = b'PMKR', Numeric # Dark Level Red
+    DarkLevelGreen = b'PMKG', Numeric # Dark Level Green
+    DarkLevelBlue = b'PMKB', Numeric # Dark Level Blue
+    ColorManagementTable = b'PMCB', ColorManagement # Color Management table
+    AxisPositionRed = b'PMAR', Numeric # Axis Position (Red) adjustment
+    AxisPositionYellow = b'PMAY', Numeric # Axis Position (Yellow) adjustment
+    AxisPositionGreen = b'PMAG', Numeric # Axis Position (Green) adjustment
+    AxisPositionCyan = b'PMAC', Numeric # Axis Position (Cyan) adjustment
+    AxisPositionBlue = b'PMAB', Numeric # Axis Position (Blue) adjustment
+    AxisPositionMagenta = b'PMAM', Numeric # Axis Position (Magenta) adjustment
+    HUERed = b'PMHR', Numeric # HUE (Red) adjustment
+    HUEYellow = b'PMHY', Numeric # HUE (Yellow) adjustment
+    HUEGreen = b'PMHG', Numeric # HUE (Green) adjustment
+    HUECyan = b'PMHC', Numeric # HUE (Cyan) adjustment
+    HUEBlue = b'PMHB', Numeric # HUE (Blue) adjustment
+    HUEMagenta = b'PMHM', Numeric # HUE (Magenta) adjustment
+    SaturationRed = b'PMSR', Numeric # Saturation (Red) adjustment
+    SaturationYellow = b'PMSY', Numeric # Saturation (Yellow) adjustment
+    SaturationGreen = b'PMSG', Numeric # Saturation (Green) adjustment
+    SaturationCyan = b'PMSC', Numeric # Saturation (Cyan) adjustment
+    SaturationBlue = b'PMSB', Numeric # Saturation (Blue) adjustment
+    SaturationMagenta = b'PMSM', Numeric # Saturation (Magenta) adjustment
+    BrightnessRed = b'PMLR', Numeric # Brightness (Red) adjustment
+    BrightnessYellow = b'PMLY', Numeric # Brightness (Yellow) adjustment
+    BrightnessGreen = b'PMLG', Numeric # Brightness (Green) adjustment
+    BrightnessCyan = b'PMLC', Numeric # Brightness (Cyan) adjustment
+    BrightnessBlue = b'PMLB', Numeric # Brightness (Blue) adjustment
+    BrightnessMagenta = b'PMLM', Numeric # Brightness (Magenta) adjustment
+    ClearMotionDrive = b'PMCM', ClearMotionDrive # Clear Motion Drive
+    MotionEnhance = b'PMME', MotionEnhance # Motion Enhance
+    LensAperture = b'PMLA', Numeric # Lens Aperture
+    LampPower = b'PMLP', LampPower # Lamp Power
+    MPCAnalyze = b'PMMA', MPCAnalyze # MPC Analyze
+    EShift4K = b'PMUS', EShift4K # 4K e-shift
+    OriginalResolution = b'PMRP', OriginalResolution # Original Resolution
+    Enhance = b'PMEN', Numeric # Enhance
+    DynamicContrast = b'PMDY', Numeric # Dynamic Contrast
+    Smoothing = b'PMST', Numeric # Smoothing
+    NameEditofPictureModeUser1 = b'PMU1' # Name Edit of Picture Mode User1
+    NameEditofPictureModeUser2 = b'PMU2' # Name Edit of Picture Mode User2
+    NameEditofPictureModeUser3 = b'PMU3' # Name Edit of Picture Mode User3
+    NameEditofPictureModeUser4 = b'PMU4' # Name Edit of Picture Mode User4
+    NameEditofPictureModeUser5 = b'PMU5' # Name Edit of Picture Mode User5
+    NameEditofPictureModeUser6 = b'PMU6' # Name Edit of Picture Mode User6
+
+    # Picture adjustment [adjustment of Picture] : Input Signal
+    HDMIInputLevel = b'ISIL', HDMIInputLevel # HDMI Input Level switch
+    HDMIColorSpace = b'ISHS', HDMIColorSpace # HDMI Color Space switch
+    HDMI2D3D = b'IS3D' # HDMI 2D/3D switch
+    HDMI3DPhase = b'IS3P' # HDMI 3D Phase adjustment
+    PicturePositionHorizontal = b'ISPH', Numeric # Picture Position (Horizontal) adjustment
+    PicturePositionVertical = b'ISPV', Numeric # Picture Position (Vertical) adjustment
+    Aspect = b'ISAS' # Aspect switch
+    Mask = b'ISMA' # Mask switch
+    MaskLeft = b'ISML', Numeric # Mask (Left) adjustment
+    MaskRight = b'ISMR', Numeric # Mask (Right) adjustment
+    MaskTop = b'ISMT', Numeric # Mask (Top) adjustment
+    MaskBottom = b'ISMB', Numeric # Mask (Bottom) adjustment
+    FilmMode = b'ISFM' # Film Mode switch
+    Parallaxof3Dconversion = b'ISLV', Numeric # Parallax of 3D conversion adjustment
+    CrosstalkCancelWhite = b'ISCA', Numeric # Crosstalk Cancel (White) adjustment
+
+    # Picture adjustment [adjustment of Picture] : Installation
+    FocusNear = b'INFN' # Focus Near adjustment (*3)
+    FocusFar = b'INFF' # Focus Far adjustment (*3)
+    ZoomTele = b'INZT' # Zoom Tele adjustment (*3)
+    ZoomWide = b'INZW' # Zoom Wide adjustment (*3)
+    ShiftLeft = b'INSL' # Shift Left adjustment (*3)
+    ShiftRight = b'INSR' # Shift Right adjustment (*3)
+    ShiftUp = b'INSU' # Shift Up adjustment (*3)
+    ShiftDown = b'INSD' # Shift Down adjustment (*3)
+    LensCover = b'INCV' # Lens Cover switch
+    ImagePattern = b'INIP' # Image Pattern switch
+    LensLock = b'INLL' # Lens Lock switch
+    PixelAdjustHorizontalRed = b'INXR', Numeric # Pixel Adjust (Horizontal Red) adjustment
+    PixelAdjustHorizontalBlue = b'INXB', Numeric # Pixel Adjust (Horizontal Blue) adjustment
+    PixelAdjustVerticalRed = b'INYR', Numeric # Pixel Adjust (Vertical Red) adjustment
+    PixelAdjustVerticalBlue = b'INYB', Numeric # Pixel Adjust (Vertical Blue) adjustment
+    InstallationStyle = b'INIS' # Installation Style switch
+    KeystoneVertical = b'INKV', Numeric # Keystone (Vertical) adjustment
+    Anamorphic = b'INVS' # Anamorphic switch
+    ScreenAdjustData = b'INSA', Numeric # Screen Adjust Data
+    ScreenAdjust = b'INSC' # Screen Adjust switch
+    PanelAlignment = b'INPA' # Panel Alignment switch
+    StoreLensmemory = b'INMS' # Store Lens memory
+    LoadLensmemory = b'INML' # Load Lens memory
+    NameEditofLensMemory1 = b'INM1' # Name Edit of Lens Memory 1
+    NameEditofLensMemory2 = b'INM2' # Name Edit of Lens Memory 2
+    NameEditofLensMemory3 = b'INM3' # Name Edit of Lens Memory 3
+    NameEditofLensMemory4 = b'INM4' # Name Edit of Lens Memory 4
+    NameEditofLensMemory5 = b'INM5' # Name Edit of Lens Memory 5
+    NameEditofLensMemory6 = b'INM6' # Name Edit of Lens Memory 6
+    NameEditofLensMemory7 = b'INM7' # Name Edit of Lens Memory 7
+    NameEditofLensMemory8 = b'INM8' # Name Edit of Lens Memory 8
+    NameEditofLensMemory9 = b'INM9' # Name Edit of Lens Memory 9
+    NameEditofLensMemory10 = b'INMA' # Name Edit of Lens Memory 10
+    FocusNear1Shot = b'IN1N' # Focus Near adjustment (1 shot)(*3)
+    FocusFar1Shot = b'IN1F' # Focus Far adjustment (1 shot) (*3)
+    ZoomTele1Shot = b'IN1T' # Zoom Tele adjustment (1 shot) (*3)
+    ZoomWide1Shot = b'IN1W' # Zoom Wide adjustment (1 shot) (*3)
+    ShiftLeft1Shot = b'IN1L' # Shift Left adjustment (1 shot) (*3)
+    ShiftRight1Shot = b'IN1R' # Shift Right adjustment (1 shot) (*3)
+    ShiftUp1Shot = b'IN1U' # Shift Up adjustment (1 shot) (*3)
+    ShiftDown1Shot = b'IN1D' # Shift Down adjustment (1 shot) (*3)
+    HighAltitudeMode = b'INHA' # High Altitude mode switch
+
+    # Picture adjustment [adjustment of Picture] : Display Setup
+    BackColor = b'DSBC' # Back Color switch
+    MenuPosition = b'DSMP' # Menu Position switch
+    SourceDisplay = b'DSSD' # Source Display switch
+    Logo = b'DSLO' # Logo switch
+    Language = b'DSLA' # Language switch
+
+    # Picture adjustment [adjustment of Picture] : Function
+    Trigger = b'FUTR' # Trigger switch
+    OffTimer = b'FUOT' # Off Timer switch
+    EcoMode = b'FUEM' # Eco Mode switch
+    Control4 = b'FUCF' # Control4
+
+    # Picture adjustment [adjustment of Picture] : Information
+    InfoInput = b'IFIN', InputState # Input display
+    InfoSource = b'IFIS', SourceData # Source display
+    InfoHorizontalResolution = b'IFRH', NumericReadOnly # Horizontal Resolution display
+    InfoVerticalResolution = b'IFRV', NumericReadOnly # Vertical Resolution display
+    InfoHorizontalFrequency = b'IFFH', NumericReadOnly # Horizontal Frequency display (*4)
+    InfoVerticalFrequency = b'IFFV', NumericReadOnly # Vertical Frequency display (*4)
+    InfoDeepColor = b'IFDC', DeepColorData # Deep Color display
+    InfoColorSpace = b'IFXV', ColorSpaceData # Color space display
+    InfoLampTime = b'IFLT', NumericReadOnly # Lamp Time display
+    InfoSoftVersion = b'IFSV' # Soft Version Display
+    InfoCalibratorInformation = b'IFCI' # Calibrator Information transmission/display (*5)
+
+    PMCalibratorInformation = b'PMCI' # Calibrator Information transmission/display (*5)
+    LanSetup = b'LS'   # LAN setup [Lan Setup]
+
+class JVCCommand:
+    """JVC projector low level command processing class"""
+    def __init__(self, print_cmd_send=False, print_cmd_res=False, print_all=False, **args):
+        self.print_cmd_send = print_cmd_send or print_all
+        self.print_cmd_res = print_cmd_res or print_all
+        self.print_cmd_bin_res = print_all
+        self.conn = jvc_protocol.JVCConnection(print_all=print_all, **args)
+
+    def __enter__(self):
+        self.conn.__enter__()
+        return self
+
+    def __exit__(self, exception, value, traceback):
+        self.conn.__exit__(exception, value, traceback)
+
+    def get(self, cmd):
+        """Send reference command and convert response"""
+        if isinstance(cmd.value, bytes):
+            raise NotImplementedError('Get is not implemented for {}'.format(cmd.name))
+        cmdcode, valtype = cmd.value
+        if issubclass(valtype, WriteOnly):
+            raise TypeError('{} is a write only command'.format(cmd.name))
+        try:
+            if issubclass(valtype, BinaryData):
+                response = self.conn.cmd_ref_bin(cmdcode)
+            else:
+                response = self.conn.cmd_ref(cmdcode)
+            return valtype(response)
+        except CommandNack as err:
+            raise CommandNack('Get: ' + err.args[0], cmd.name)
+
+    def set(self, cmd, val):
+        """Send operation command"""
+        cmdcode, valtype = cmd.value
+        assert not issubclass(valtype, ReadOnly), '{} is a read only command'.format(cmd)
+        val = valtype(val)
+        assert(isinstance(val, valtype)), '{} is not {}'.format(val, valtype)
+        try:
+            if issubclass(valtype, BinaryData):
+                self.conn.cmd_op(cmdcode, sendrawdata=val.value)
+            else:
+                self.conn.cmd_op(cmdcode+val.value)
+        except CommandNack as err:
+            raise CommandNack('Set: ' + err.args[0], cmd.name, val)
 
 def main():
     """JVC command class test"""
     print('test jvc command class')
     try:
         with JVCCommand(print_all=False) as jvc:
-            jvc.null_op()
-            model = jvc.get_model()
+            jvc.set(Command.Null, Null.Null)
+            model = jvc.get(Command.Model)
             print('Model:', model)
-            power_state = jvc.get_power()
+            power_state = jvc.get(Command.Power)
             print('Power:', power_state)
-            if power_state == PowerState.StandBy:
+            while power_state != PowerState.LampOn:
+                print('Projector is not on ({}), most commands will fail'.format(
+                    power_state.name))
+                res = input('Enter "on" to send power on command, or "i" to ignore: ')
+                if res == 'on':
+                    try:
+                        jvc.set(Command.Power, PowerState.LampOn)
+                    except jvc_protocol.CommandNack:
+                        print('Failed to set power')
+                elif res == 'i':
+                    break
+                power_state = jvc.get(Command.Power)
+
+            skipped = []
+            for command in Command:
                 try:
-                    jvc.set_power(False)
-                except jvc_protocol.CommandNack:
-                    print('Failed to set power')
-                print('Power:', jvc.get_power())
-            try:
-                inputport = jvc.get_input()
-                print('Input', inputport)
-                #jvc.set_input(inputport) # slow
-                #inputport = jvc.get_input()
-                #print('Input', inputport)
-            except jvc_protocol.CommandNack:
-                print('Failed to get/set input')
+                    res = jvc.get(command)
+                    if isinstance(res, list):
+                        dumpdata.dumpdata(command.name, '{:4}', res, limit=16)
+                    else:
+                        print('{}: {!s}'.format(command.name, res))
+                except CommandNack as err:
+                    print('-{}: {!s}'.format(command.name, err.args[0]))
+                except (TypeError, NotImplementedError) as err:
+                    skipped.append((command, err))
+            for command, err in skipped:
+                print('-Skipped {}: {!s}'.format(command.name, err))
 
-            print(jvc.get_info_input())
-            print('Source:', jvc.get_info_source())
-            print('Deep Color:', jvc.get_info_deep_color())
-            print('Color Space:', jvc.get_info_color_space())
+            input('Test complete, press enter: ')
 
-            #jvc.send_remote_code(0x7374) #info
-
-            print(jvc.get_picture_mode())
-            print(jvc.get_gamma_table())
-            print(jvc.get_gamma_correction())
-            try:
-                gamma_red = jvc.get_gamma(Command.gammared)
-                dumpdata.dumpdata('  Gamma Red:', '{:4d}', gamma_red, limit=16)
-            except jvc_protocol.CommandNack:
-                print('Failed to get gamma')
     except CommandNack as err:
         print('Nack', err)
     except jvc_protocol.jvc_network.Error as err:
