@@ -127,8 +127,17 @@ def load_gamma(*newgamma):
                 'Correction value for %s is not set to import, %s' % (old_gamma_table, gamma_correction)
 
             jvc.set_gamma(Command.gammared, newgamma[0])
+            gamma_red = jvc.get_gamma(Command.gammared)
+            if gamma_red != newgamma[0]:
+                print('Failed to verify red gamma table')
             jvc.set_gamma(Command.gammagreen, newgamma[1])
+            gamma_green = jvc.get_gamma(Command.gammagreen)
+            if gamma_green != newgamma[1]:
+                print('Failed to verify green gamma table')
             jvc.set_gamma(Command.gammablue, newgamma[2])
+            gamma_blue = jvc.get_gamma(Command.gammablue)
+            if gamma_blue != newgamma[2]:
+                print('Failed to verify blue gamma table')
         except CommandNack as err:
             print('Nack', err)
 
