@@ -408,7 +408,7 @@ class JVCCommand:
     def set_gamma_table(self, gamma_table):
         """Set Gamma Table"""
         assert isinstance(gamma_table, GammaTable)
-        self.cmd_op(Command.GammaTable, gamma_table.value, acktimeout=10)
+        self.cmd_op(Command.GammaTable, gamma_table.value, acktimeout=30)
 
     def get_gamma_correction(self):
         """Get Gamma Correction"""
