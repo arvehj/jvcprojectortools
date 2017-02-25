@@ -32,6 +32,7 @@ class JVCConnection:
         self.print_cmd_res = print_cmd_res or print_all
         self.print_cmd_bin_res = print_all
         self.conn = jvc_network.JVCNetwork(print_all=print_all, **args)
+        self.reconnect = False
 
     def __enter__(self):
         self.conn.__enter__()
@@ -46,17 +47,36 @@ class JVCConnection:
             print('  > Cmd:', cmdtype, cmdtype.value+cmd)
         assert cmdtype == Header.operation or cmdtype == Header.reference
 
-        self.conn.send(cmdtype.value + UNIT_ID + cmd + END)
-        try:
-            self.conn.expect(Header.ack.value + UNIT_ID + cmd[:2] + END, timeout=acktimeout)
-        except jvc_network.Timeout:
-            raise CommandNack(cmdtype, cmd)
+        retry_count = 1
+        while True:
+            if self.reconnect:
+                self.reconnect = False
+                self.conn.reconnect()
 
-        if sendrawdata is None:
-            return
+            try:
+                self.conn.send(cmdtype.value + UNIT_ID + cmd + END)
+                expect_ack = 1
+                self.conn.expect(Header.ack.value + UNIT_ID + cmd[:2] + END, timeout=acktimeout)
 
-        self.conn.send(sendrawdata)
-        self.conn.expect(Header.ack.value + UNIT_ID + cmd + END, timeout=20)
+                if sendrawdata is None:
+                    return
+
+                self.conn.send(sendrawdata)
+                expect_ack = 2
+                self.conn.expect(Header.ack.value + UNIT_ID + cmd + END, timeout=20)
+
+            except jvc_network.Closed:
+                self.reconnect = True
+                if retry_count:
+                    print('Connection closed, retry', retry_count)
+                    retry_count -= 1
+                    continue
+                raise
+            except jvc_network.Timeout:
+                self.reconnect = True
+                raise CommandNack('Data not acknowledged' if expect_ack == 2 else
+                                  'Command not acknowledged', cmdtype, cmd)
+            break
 
     def cmd_op(self, cmd, **kwargs):
         """Send operation command"""
