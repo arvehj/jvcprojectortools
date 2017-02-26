@@ -124,7 +124,7 @@ class JVCNetwork:
         if timeout:
             ready = select.select([self.socket], [], [], timeout)
             if not ready[0]:
-                raise Timeout()
+                raise Timeout('{} second timeout expired'.format(timeout))
         data = self.socket.recv(limit)
         if not len(data):
             raise Closed('Connection closed by projector')
