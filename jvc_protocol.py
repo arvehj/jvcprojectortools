@@ -63,7 +63,7 @@ class JVCConnection:
 
                 self.conn.send(sendrawdata)
                 expect_ack = 2
-                self.conn.expect(Header.ack.value + UNIT_ID + cmd + END, timeout=20)
+                self.conn.expect(Header.ack.value + UNIT_ID + cmd[:2] + END, timeout=20)
 
             except jvc_network.Closed:
                 self.reconnect = True
@@ -99,7 +99,11 @@ class JVCConnection:
     def cmd_ref_bin(self, cmd, **kwargs):
         """Send command and retrieve binary response"""
         self._cmd(Header.reference, cmd, **kwargs)
-        res = self.conn.recv()
+        try:
+            res = self.conn.recv(timeout=10)
+        except jvc_network.Timeout as err:
+            self.reconnect = True
+            raise jvc_network.Timeout('Timeout waiting for bindata', err)
         if self.print_cmd_bin_res:
             dumpdata.dumpdata('  < Response:', '{:02x}', res)
         return res
