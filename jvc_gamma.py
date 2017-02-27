@@ -274,9 +274,11 @@ class GammaCurve():
             th = 1
             sat_o = end_slope
             sat_p = clip_p + (sat_o - clip_o) / clip_gain
-            if sat_p > ppeak:
+            peak_o = 1
+            if clip_p + (1 - clip_o) / clip_gain > ppeak:
                 sat_p = ppeak
                 sat_o = (sat_p - clip_p) * clip_gain + clip_o
+                peak_o = sat_o
 
             while th - tl > 0.00001:
                 Btp = B(t, clip_p, sat_p, sat_p, ppeak)
@@ -285,7 +287,7 @@ class GammaCurve():
                 else:
                     th = t
                 t = tl + (th - tl) / 2
-            Btl = B(t, clip_o, sat_o, sat_o, 1)
+            Btl = B(t, clip_o, sat_o, sat_o, peak_o)
             if debug > 2:
                 print('{:3.0f}: p {:7.4f}, Btp {:7.4f}, t {:7.4f}, '
                       'Bt {:7.4f}, clip_p {:7.4f}, sat_p {:7.4f}, '
