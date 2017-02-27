@@ -3,7 +3,7 @@
 Scripts to send commands 2015 model JVC D-ILA Projectors.
 
 ## Prerequisites
-- python3 installed
+- Python [3.6](https://www.python.org/downloads/release/python-360/) or [later](https://www.python.org/downloads/) installed
 - Network connected JVC projector
 
 ## Tools
