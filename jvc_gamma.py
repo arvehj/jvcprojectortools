@@ -123,8 +123,8 @@ class GammaCurve():
                 conf.pop('eotf', None)
 
         if highlight:
-            name, value = highlight.split('.')
-            obj = Highlight.NONE;
+            _, value = highlight.split('.')
+            obj = Highlight.NONE
             for flag in value.split('|'):
                 obj |= Highlight[flag]
             conf['highlight'] = obj
@@ -200,11 +200,16 @@ class GammaCurve():
         """Compute virtual bblack from absolute bblack and brefwhite"""
         return self.bblack * 100 / self.brefwhite
 
-    def set_scaled_bsoftclip(self, bbase, bmin, scale):
+    def set_scaled_bsoftclip(self, bbase, bmin, scale, hcscale):
         """Set paramters scale bsoftclip based on bmax"""
         self.bsoftclip = {'bbase': bbase,
                           'bmin': bmin,
-                          'scale': scale}
+                          'scale': scale,
+                          'hcscale': hcscale}
+
+    def get_effective_bhardclip(self):
+        """Return bhardclip or infinite is it is not set"""
+        return math.inf if self.bhardclip is None else self.bhardclip
 
     def get_effective_bsoftclip(self):
         """Return bsoftclip or compute it from paramters and effective bmax"""
@@ -212,9 +217,15 @@ class GammaCurve():
         if bsoftclip is None:
             return math.inf
         if isinstance(bsoftclip, dict):
-            base = bsoftclip['bbase']
-            bsoftclip = max(bsoftclip['bmin'],
-                            base + (self.get_effective_bmax() - base) * bsoftclip['scale'])
+            bmax = self.get_effective_bmax()
+            bhardclip = self.get_effective_bhardclip()
+            bmin = bsoftclip.get('bmin', 0)
+            base = bsoftclip.get('bbase', 0)
+            scale = bsoftclip.get('scale', 0)
+            hcscale = bsoftclip.get('hcscale', math.inf)
+            bsoftclip = max(bmin,
+                            base + (bmax - base) * scale,
+                            max(0, bmax - (bhardclip - bmax) * hcscale))
         return bsoftclip
 
     def itop(self, i):
