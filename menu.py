@@ -19,7 +19,8 @@ GAMMA_HDR_DEFAULT = {
     'brefwhite': 25,
     'bsoftclip': {'bmin': 100,
                   'bbase': 25,
-                  'scale': 0.4},
+                  'scale': 0.4,
+                  'hcscale': 0.5},
     'bhardclip': 4000,
     'end_slope': 0.75,
     'clip': 0,
@@ -50,7 +51,8 @@ GAMMA_PRESETS = [
         'brefwhite': 25,
         'bsoftclip': {'bmin': 100,
                       'bbase': 25,
-                      'scale': 0.4},
+                      'scale': 0.4,
+                      'hcscale': 0.5},
         'bhardclip': 1200,
         'end_slope': 0.75,
         'clip': 0,
@@ -433,12 +435,12 @@ class Menu():
     def select_softclip(self, arg):
         """Set softclip start value(s)"""
         if not arg:
-            arg = input('enter bsoftclip or bbase bmin scale: ')
+            arg = input('enter bsoftclip or bbase bmin scale hcscale: ')
         args = arg.split(' ')
         if len(args) == 1:
             self.gamma.bsoftclip = float(args[0])
         else:
-            self.gamma.set_scaled_bsoftclip(float(args[0]), float(args[1]), float(args[2]))
+            self.gamma.set_scaled_bsoftclip(*map(float, args))
 
     def autoplot_clear_enabled(self):
         """Return if plot should auto-clear"""
