@@ -629,10 +629,11 @@ class Menu():
                     val = input_num(*sel[3:], numtype=numtype, data=arg)
                     if val is not None:
                         self.gamma.set(sel[3], val)
-                if self.autoplot_enabled():
-                    while len(gammahist) > self.autoplot_history:
-                        gammahist.pop(0)
-                    table = self.gamma.get_table()
+            if self.autoplot_enabled():
+                while len(gammahist) > self.autoplot_history:
+                    gammahist.pop(0)
+                table = self.gamma.get_table()
+                if len(gammahist) == 0 or table != gammahist[-1]:
                     if self.autoplot_clear_enabled():
                         self.plot.clear([self.gamma.irefblack, self.gamma.ipeakwhite,
                                          self.gamma.ihardclip, self.gamma.isoftclip])
