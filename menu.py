@@ -214,8 +214,13 @@ class Menu():
         """HDR setup helper"""
         try:
             with JVCCommand() as jvc:
-                model = jvc.get(Command.Model)
-                print('Found projector model:', model.name)
+                try:
+                    model = jvc.get(Command.Model)
+                    print('Found projector model:', model.name)
+                except ValueError:
+                    if not strtobool(input('Unknown projector model.\n'
+                                           'Ignore and continue (y/n)? ')):
+                        raise
                 while True:
                     power_state = jvc.get(Command.Power)
                     if power_state != PowerState.LampOn:
