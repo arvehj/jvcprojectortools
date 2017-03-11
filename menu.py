@@ -555,11 +555,10 @@ class Menu():
                 ]
             return
 
-        print()
         if self.gamma.get_effective_bmax() > self.gamma.get_effective_bhardclip():
+            print()
             print('Warning, hard clip is set lower than the effective max brightness')
-        print('Effective softclip: {}'.format(self.gamma.get_effective_bsoftclip()))
-        print()
+            print()
 
         def menu_param(cmd, gamma, name, param, low, high):
             """Create menu entry for a paramter"""
