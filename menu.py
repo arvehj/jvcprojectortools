@@ -556,7 +556,7 @@ class Menu():
             return
 
         print()
-        if self.gamma.get_effective_bmax() > self.gamma.bhardclip:
+        if self.gamma.get_effective_bmax() > self.gamma.get_effective_bhardclip():
             print('Warning, hard clip is set lower than the effective max brightness')
         print('Effective softclip: {}'.format(self.gamma.get_effective_bsoftclip()))
         print()
