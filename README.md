@@ -68,7 +68,10 @@ Use this to set the peak brightness your projector can reach. The first number s
 ### Set ref white brightness
 Sets how bright you want a 100 nit reference white input signal to be. Lowering this value will make the image darker and increasing it will make the image brighter.
 
-### Set black brightness
+### Set black brightness in
+Subtracts an offset from all input values. This is useful if the source content is using an elevated black level.
+
+### Set black brightness out
 Adds an offset to all non-black output values. This is useful if the projector crushes near-black values to black.
 
 ### eotf black compensation
