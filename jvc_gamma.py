@@ -84,6 +84,7 @@ class GammaCurve():
     def __init__(self):
         self.irefblack, self.ipeakwhite = HDMI_INPUT_LEVEL_MAP[HDMIInputLevel.Standard]
         self.bblack = 0.0
+        self.bblackin = 0.0
         self.brefwhite = 100.0
         self.bmax = 100
         self.bsoftclip = None
@@ -192,15 +193,31 @@ class GammaCurve():
         """Get hdmi inputlevel from irefblack and ipeakwhite"""
         return HDMI_INPUT_LEVEL_RMAP[self.irefblack, self.ipeakwhite]
 
+    def get_bscale(self):
+        """Return brigthness scale factor"""
+        return 100 / self.brefwhite
+
+    def bo_to_bi(self, bo):
+        """Convert from output/measured brightness to input/virtual brightness"""
+        return bo * self.get_bscale()
+
+    def bi_to_bo(self, bi):
+        """Convert from input/virtual brightness to output/measured brightness"""
+        return bi / self.get_bscale()
+
     def get_effective_bmax(self):
         """Compute virtual bmax from absolute bmax and brefwhite"""
-        return self.bmax * 100 / self.brefwhite
+        return self.bo_to_bi(self.bmax)
+
+    def get_effective_bblackout(self):
+        """Compute virtual bblack out from absolute bblack and brefwhite"""
+        return self.bo_to_bi(self.bblack)
 
     def get_effective_bblack(self):
         """Compute virtual bblack from absolute bblack and brefwhite"""
-        return self.bblack * 100 / self.brefwhite
+        return self.get_effective_bblackout() - self.bblackin
 
-    def set_scaled_bsoftclip(self, bbase, bmin, scale, hcscale):
+    def set_scaled_bsoftclip(self, bbase, bmin, scale, hcscale=math.inf):
         """Set paramters scale bsoftclip based on bmax"""
         self.bsoftclip = {'bbase': bbase,
                           'bmin': bmin,
