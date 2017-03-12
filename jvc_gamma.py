@@ -179,7 +179,7 @@ class GammaCurve():
 
     def set(self, param, val):
         """Set parameter and regenerate gamma table"""
-        assert hasattr(self, param), 'Unknown gamma curve paramter {}'.format(param)
+        assert hasattr(self, param), 'Unknown gamma curve parameter {}'.format(param)
         setattr(self, param, val)
         self.generate_table()
 
@@ -314,7 +314,7 @@ class GammaCurve():
         last_p = None
         for p in points:
             l = ptol(p)
-            if l >= lsoftclip and clip_p is math.inf and last_p is not None:
+            if l >= lsoftclip and clip_p is math.inf and last_p is not None and l > last_l:
                 clip_p = last_p
                 clip_l = last_l
                 clip_gain = (l ** (1 / clip_gamma) - last_l ** (1 / clip_gamma)) / (p - last_p)
@@ -338,7 +338,7 @@ class GammaCurve():
         for p in points:
             l = ptol(p)
             lc = min(clip(p, l, clip_p, clip_l, clip_gain, hardclip_p), lhardclip)
-            cliptable.append(lc / l if lc else 1 if not l else 0)
+            cliptable.append(lc / l if l else 1 if lc <= 0 else 0)
             oi = oscale(lc)
             if debug > 3:
                 print('{:3.0f}: {:4d} {:7.1f} {:7.4f} {:7.4f} {:7.4f} {:7.4f}'.format(
