@@ -2,6 +2,7 @@
 
 """JVC projector tool menu"""
 
+import math
 import traceback
 from distutils.util import strtobool
 
@@ -182,6 +183,7 @@ class Menu():
         self.verify = True
         self.plot = None
         self.plot_menu = False
+        self.replot = False
         self.adjust_menu_on = False
         self.gammaref = []
         try:
@@ -201,6 +203,17 @@ class Menu():
     def save(self, basename):
         """Save gamma curve to file"""
         self.gamma.file_save(basename)
+
+    def itostr(self, value):
+        """Convert gamma table index to input brightness"""
+        try:
+            p = self.gamma.itop(value)
+            if p < 0:
+                raise ValueError
+            b = self.gamma.eotf.L(p) * self.gamma.eotf.peak
+            return '{:.5g} cd/m²'.format(b)
+        except:
+            return ''
 
     def preset_gamma_menu_select(self, _):
         """Load gamma curve from build in preset"""
@@ -473,6 +486,8 @@ class Menu():
         except:
             autoplot = self.autoplot + 1
         self.autoplot = autoplot % 3
+        if self.autoplot == 2:
+            self.replot = True
 
     zoom_presets = {
         'f': (),
@@ -494,6 +509,7 @@ class Menu():
     def plot_zoom_select(self, arg):
         """Run zoom menu entry"""
         self.plot.zoom(*self.zoom_presets[arg])
+        self.replot = True
 
     def gammaref_menu(self, arg):
         """Add or remove reference gamma curves plot"""
@@ -542,6 +558,88 @@ class Menu():
             ('pz', self.plot_zoom_show(), self.plot_zoom_select),
             ('pr', 'Plot reference curve [a|r<index>|c|d<index>]', self.gammaref_menu),
             ]
+
+    def clear_plot_draw_grid(self):
+        """Clear plot and draw grid lines"""
+        grid_space = 28 * self.plot.scale
+        unlabeled_color = 'gray97'
+        vlines = [
+            (self.gamma.irefblack, 'Black'),
+            (self.gamma.ipeakwhite, 'Peak white'),
+            (self.gamma.ihardclip, 'Hard Clip'),
+            (self.gamma.isoftclip, 'Soft Clip'),
+            ]
+        vlines += [(round(self.gamma.ptoi((i / 4 - 16) / (235 - 16)) * 4) / 4, '')
+                   for i in range(0, 1023, max(1, round(4 * 16 * self.plot.scale)))]
+        vlines.sort()
+
+        hlines = [
+            (self.gamma.get_effective_bmax(), ''),
+            (self.gamma.get_effective_bblackout(), 'Black Out\n'),
+            (self.gamma.get_effective_bsoftclip(), 'Soft Clip\n'),
+            ]
+        hlines += [(round(b, -int(math.floor(math.log10(b)))), '')
+                   for b in [10 ** (i / 3) for i in range(-12, 14)]]
+        hlines.sort()
+
+        lines = []
+        last_i = -math.inf
+        last_i_count = None
+        last_i_name = None
+        for i, name in vlines:
+            if i < 0:
+                continue
+            if i - last_i > grid_space or (name and not last_i_name):
+                if i - last_i <= grid_space:
+                    line = (last_i, False, None)
+                    if not last_i_name:
+                        line = line + (unlabeled_color,)
+                    lines[last_i_count] = line
+                line = (i, False, '{}\n{:.5g}/{:.5g}/{:.5g}\n{}'.format(
+                    name,
+                    i, 16 + self.gamma.itop(i) * (235 - 16),
+                    16 * 4 + self.gamma.itop(i) * (235 - 16) * 4,
+                    self.itostr(i)))
+                last_i = i
+                last_i_name = name
+                last_i_count = len(lines)
+            else:
+                line = (i, False, None)
+            if not name:
+                line = line + (unlabeled_color,)
+            lines.append(line)
+
+        grid_space *= 4
+        last_o = -math.inf
+        last_o_count = None
+        last_o_name = None
+        for b, name in hlines:
+            try:
+                if b <= 0:
+                    continue
+                l = b / self.gamma.get_effective_bmax()
+                o = (l ** (1/2.2)) * 1023
+            except ValueError:
+                continue
+
+            if o - last_o > grid_space or (name and not last_o_name):
+                if o - last_o <= grid_space:
+                    line = (last_o, True, None)
+                    if not last_o_name:
+                        line = line + (unlabeled_color,)
+                    lines[last_o_count] = line
+                line = (o, True, '{}{:.5g} cd/m²\nvirt {:.3g} cd/m²\no: {:.4g}'.format(
+                    name, self.gamma.bi_to_bo(b), b, o))
+                last_o = o
+                last_o_name = name
+                last_o_count = len(lines)
+            else:
+                line = (o, True, None)
+            if not name:
+                line = line + (unlabeled_color,)
+            lines.append(line)
+
+        self.plot.clear(lines=lines)
 
     def select_gamma_adjust_menu(self, _):
         """Toggle gamma curve adjustments"""
@@ -636,19 +734,24 @@ class Menu():
                     val = input_num(*sel[3:], numtype=numtype, data=arg)
                     if val is not None:
                         self.gamma.set(sel[3], val)
+                        self.replot = True
             if self.autoplot_enabled():
-                while len(gammahist) > self.autoplot_history:
+                while len(gammahist) > self.autoplot_history + 1:
                     gammahist.pop(0)
                 table = self.gamma.get_table()
-                if len(gammahist) == 0 or table != gammahist[-1]:
+                if len(gammahist) == 0 or table != gammahist[-1] or self.replot:
+                    self.replot = False
+                    if len(gammahist) == 0 or table != gammahist[-1]:
+                        while len(gammahist) > self.autoplot_history:
+                            gammahist.pop(0)
                     if self.autoplot_clear_enabled():
-                        self.plot.clear([self.gamma.irefblack, self.gamma.ipeakwhite,
-                                         self.gamma.ihardclip, self.gamma.isoftclip])
+                        self.clear_plot_draw_grid()
                         for rtable in self.gammaref:
                             self.plot.plot(rtable, colors=['gray50'], draw_speed=1024)
                         for htable in gammahist:
                             self.plot.plot(htable, colors=['gray70'], draw_speed=1024)
-                    gammahist.append(table)
+                    if len(gammahist) == 0 or table != gammahist[-1]:
+                        gammahist.append(table)
                     self.plot.plot(table, draw_speed=256)
 
 def main():
