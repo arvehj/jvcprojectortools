@@ -197,6 +197,10 @@ class GammaCurve():
         """Return brigthness scale factor"""
         return 100 / self.brefwhite
 
+    def set_bscale(self, bscale):
+        """Set brefwhite from brigthness scale factor"""
+        self.brefwhite = 100 / bscale
+
     def bo_to_bi(self, bo):
         """Convert from output/measured brightness to input/virtual brightness"""
         return bo * self.get_bscale()

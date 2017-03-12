@@ -65,6 +65,9 @@ Highlight input signals by changing the color. Enter "hl" to get a menu of optio
 ### Set max brightness
 Use this to set the peak brightness your projector can reach. The first number shown is the number you enter. The second number is a "virtual" brightness scaled by the reference white setting.
 
+### Set brightness scale factor
+Sets reference white based on a scale factor. Lowering this value will make the image brighter and increasing it will make the image darker.
+
 ### Set ref white brightness
 Sets how bright you want a 100 nit reference white input signal to be. Lowering this value will make the image darker and increasing it will make the image brighter.
 

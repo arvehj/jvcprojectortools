@@ -673,6 +673,8 @@ class Menu():
                 ('hl', self.show_highlight(), self.select_highlight),
                 ('bm', 'Set max brightness: {} (Effective {})'.format(
                     self.gamma.bmax, self.gamma.get_effective_bmax()), None, 'bmax', 10.0, 10000.0),
+                ('bs', 'Set brightness scale factor: {}'.format(self.gamma.get_bscale()),
+                 lambda arg: self.gamma.set_bscale(float(arg))),
                 menu_param('bw', self.gamma, 'Set ref white brightness', 'brefwhite', 1.0, 100.0),
                 ('bbi', 'Set black brightness in: {} (Effective {})'.format(
                     self.gamma.bblackin, self.gamma.get_effective_bblack()),
