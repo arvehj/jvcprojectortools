@@ -576,8 +576,11 @@ class Menu():
                 ('bm', 'Set max brightness: {} (Effective {})'.format(
                     self.gamma.bmax, self.gamma.get_effective_bmax()), None, 'bmax', 10.0, 10000.0),
                 menu_param('bw', self.gamma, 'Set ref white brightness', 'brefwhite', 1.0, 100.0),
-                ('bb', 'Set black brightness: {} (Effective {})'.format(
-                    self.gamma.bblack, self.gamma.get_effective_bblack()),
+                ('bbi', 'Set black brightness in: {} (Effective {})'.format(
+                    self.gamma.bblackin, self.gamma.get_effective_bblack()),
+                 None, 'bblackin', 0.0, 5.0),
+                ('bbo', 'Set black brightness out: {} (Effective {})'.format(
+                    self.gamma.bblack, self.gamma.get_effective_bblackout()),
                  None, 'bblack', 0.0, 5.0),
                 ('eb', self.eotf_black_menu_show(), self.eotf_black_menu_select),
                 menu_param('bh', self.gamma, 'Set hard clip', 'bhardclip', 0.1, 100000),
