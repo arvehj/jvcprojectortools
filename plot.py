@@ -2,24 +2,28 @@
 
 """Plot gamma curves"""
 
+import numbers
 import turtle
+from tkinter.font import Font
 
 class Plot:
     """Class to plot gamma gamma curves and keep track of zoom level"""
-    def __init__(self, vlines=()):
-        self.plot_area = (-1, -1, 256, 1024)
-        self.min_size = (4, 16)
+    def __init__(self, lines=()):
+        self.margin = (-30, -60, 8, 32)
+        self.plot_area = (0, 0, 255, 1023)
+        self.min_size = (2, 8)
         self.zoom_area = [*self.plot_area]
         self.zoom()
-        self.draw_grid(vlines=vlines)
+        self.draw_grid(lines=lines)
 
-    def clear(self, vlines=()):
+    def clear(self, lines=(), vlines=()):
         """Clear plot and draw grid lines"""
         turtle.clear()
-        self.draw_grid(vlines=vlines)
+        self.draw_grid(lines=lines, vlines=vlines)
 
     def zoom(self, level=None, direction=(0, 0)):
         """Zoom in or out"""
+        self.scale = 1
         if level is None:
             self.zoom_area = [*self.plot_area]
         else:
@@ -42,10 +46,44 @@ class Plot:
                     new_h = max_h
                     new_l = new_h - new_size
                 self.zoom_area[i], self.zoom_area[i + 2] = new_l, new_h
+                self.scale = new_size / max_size
 
-        turtle.setworldcoordinates(*self.zoom_area)
+        turtle.setworldcoordinates(*(a + b * self.scale
+                                     for a, b in zip(self.zoom_area, self.margin)))
 
-    def draw_grid(self, vlines=()):
+    def draw_line(self, pos, horizontal=False, label=None, color='gray90', label_color='gray35'):
+        """Draw one horizontal or vertical line with optional color and label"""
+        if pos is None:
+            return
+        if pos < self.plot_area[0 + horizontal] or pos > self.plot_area[2 + horizontal]:
+            return
+        turtle.penup()
+        xscale = turtle.getscreen().xscale
+        yscale = turtle.getscreen().yscale
+        if label:
+            font_family = 'Ariel'
+            font_size = 8
+            font = Font(family=font_family, size=font_size)
+            line_height = font.metrics('linespace') / yscale
+            height = (label.count('\n') + 1) * line_height
+            turtle.color(label_color)
+            turtle.setposition(-8 / xscale if horizontal else pos,
+                               pos - 0.5 * height if horizontal else
+                               -height - 6 / yscale)
+            turtle.write(label, align='right' if horizontal else'center',
+                         font=(font_family, font_size))
+            turtle.setposition(-4 / xscale if horizontal else pos,
+                               pos if horizontal else -4 / yscale)
+            turtle.pendown()
+        turtle.setposition(1 / xscale if horizontal else pos,
+                           pos if horizontal else 1 / yscale)
+        turtle.color(color)
+        turtle.pendown()
+        turtle.setposition(self.plot_area[2] if horizontal else pos,
+                           pos if horizontal else self.plot_area[3])
+        turtle.penup()
+
+    def draw_grid(self, lines=(), vlines=()):
         """Draw grid lines"""
         turtle.tracer(0)
         turtle.hideturtle()
@@ -60,12 +98,11 @@ class Plot:
         turtle.setposition(0, 0)
         turtle.penup()
         turtle.color('gray90')
-        for vline in vlines:
-            if vline is not None:
-                turtle.setposition(vline, 1)
-                turtle.pendown()
-                turtle.setposition(vline, 1023)
-                turtle.penup()
+        for line in list(lines) + list(vlines):
+            if line is not None:
+                if isinstance(line, numbers.Number):
+                    line = (line,)
+                self.draw_line(*line)
         turtle.update()
 
     def plot(self, *gamma, colors=['red', 'green', 'blue'], draw_speed=16, scale_x=1):
@@ -104,8 +141,17 @@ def main():
     """Test Plot class"""
     p = Plot()
     p.plot([512 for i in range(256)], draw_speed=4)
-    p.clear(vlines=[i for i in range(16, 256-15, 16)])
+    p.clear(lines=[(i, False, str(i)) for i in range(16, 256-15, 16)] +
+            [(i, True, str(i)) for i in range(64, 1024-63, 64)])
     p.plot([512 for i in range(256)], draw_speed=4)
+    p.clear(lines=[(128, False, 'Green line\nlabel', 'green'),
+                   (136, False, 'Blue\nline\nlabel', 'blue')])
+    p.plot([512 for i in range(256)], draw_speed=4)
+    p.zoom(4, (0, -1))
+    p.clear(lines=[(128, False, 'Green line\nlabel', 'green'),
+                   (136, False, 'Blue\nline\nlabel', 'blue')])
+    p.plot([512 for i in range(256)], draw_speed=4)
+    p.zoom()
     p.clear()
     p.plot([512 for i in range(256)], draw_speed=4)
     p.clear(vlines=range(256))
