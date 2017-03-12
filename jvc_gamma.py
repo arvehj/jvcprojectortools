@@ -66,10 +66,7 @@ def write_gamma_curve(jvc, colorcmd, table, verify, retry=1):
     """Write gamma curve for a single color to projector"""
     while True:
         try:
-            jvc.set(colorcmd, table)
-            if verify:
-                if jvc.get(colorcmd) != table:
-                    raise Exception('Verify failed', colorcmd)
+            jvc.set(colorcmd, table, verify=verify)
             break
         except Exception as err:
             print('Failed to send {}, {}'.format(colorcmd.name, err))

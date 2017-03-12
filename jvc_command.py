@@ -12,7 +12,10 @@ class ReadOnly():
     """Common base class for read-only command arguments"""
     pass
 
-class WriteOnly():
+class NoVerify():
+    """Common base class for command arguments that cannot be read back"""
+
+class WriteOnly(NoVerify):
     """Common base class for write-only command arguments"""
     pass
 
@@ -112,7 +115,7 @@ class RemoteCode(WriteOnly, Enum):
     Menu = b'732E'
     PictureAdjust = b'7372'
 
-class PowerState(Enum):
+class PowerState(NoVerify, Enum):
     """Power state"""
     StandBy = b'0' # send/get
     LampOn = b'1' # send/get
@@ -554,7 +557,7 @@ class JVCCommand:
         except CommandNack as err:
             raise CommandNack('Get: ' + err.args[0], cmd.name)
 
-    def set(self, cmd, val):
+    def set(self, cmd, val, verify=True):
         """Send operation command"""
         cmdcode, valtype = cmd.value
         assert not issubclass(valtype, ReadOnly), '{} is a read only command'.format(cmd)
@@ -564,9 +567,16 @@ class JVCCommand:
             if issubclass(valtype, BinaryData):
                 self.conn.cmd_op(cmdcode, sendrawdata=val.value)
             else:
-                self.conn.cmd_op(cmdcode+val.value)
+                self.conn.cmd_op(cmdcode+val.value, acktimeout=5)
         except CommandNack as err:
             raise CommandNack('Set: ' + err.args[0], cmd.name, val)
+
+        if not verify or issubclass(valtype, NoVerify):
+            return
+
+        verify_val = self.get(cmd)
+        if verify_val != val:
+            raise CommandNack('Verify error: ' + cmd.name, val, verify_val)
 
 def main():
     """JVC command class test"""
