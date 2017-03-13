@@ -272,11 +272,10 @@ class Menu():
                     print('Selected', user_mode.name, gamma_table.name, gamma_correction.name)
                     break
 
-            self.set_source_brightness_contrast()
-
             self.gamma.conf_load(GAMMA_HDR_DEFAULT)
             self.gamma.set_input_level(input_level)
 
+            self.set_source_brightness_contrast()
             self.hdr_contrast_menu()
 
         except CommandNack as err:
@@ -309,7 +308,6 @@ class Menu():
 
             print('Adjust contrast and brightness on your source so black and white turn green')
             input('Press enter when done: ')
-            self.gamma.write(verify=self.verify)
         finally:
             if saved_input_level:
                 with JVCCommand() as jvc:
@@ -317,6 +315,7 @@ class Menu():
                         print('Changing input level from Enhanced to {}'.format(
                             saved_input_level.name))
                         jvc.set(Command.HDMIInputLevel, saved_input_level)
+            self.gamma.write(verify=self.verify)
 
     def contrast_to_brefwhite(self, contrast):
         """Calculate brefwhite (for contrast 0) value based on specified contrast setting"""
@@ -340,6 +339,7 @@ class Menu():
                     contrast = jvc.get(Command.Contrast)
                     print('Contrast', contrast)
                     if contrast == 0:
+                        jvc.set(Command.Remote, RemoteCode.Back)
                         break
 
                     self.contrast_to_brefwhite(contrast)
