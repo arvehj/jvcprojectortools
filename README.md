@@ -16,10 +16,10 @@ The menu lists the commands you can enter on the left and a description on the r
 This menu checks your setup and configures a HDR gamma curve that you can tune the brightness of.
 
 ### Set brightness and contrast for source
-Run only the source brightness/contrast check from Setup HDR.
+Run only the source brightness/contrast check from Setup HDR. This loads a special gamma table that will add color near the correct black and white input signals. When the source input level is correct black will be dark green and white will be bright green. If black appears red-brown it is too dark, and if it appears yellow-brown it is too bright. If white appears yellow it is too dark and if it appears red it is too bright. The brightness and contrast controls on you source may affect both white and black so you may need switch between them several times to get both black and white at the correct level.
 
 ### Load into projector and tune with contrast control
-Adjust the brightness of the current gamma curve using the contrast control on the projector.
+Adjust the brightness of the current gamma curve using the contrast control on the projector. This starts by writing the current gamma curve to the projector. You can then make the image brighter or darker with the contrast control on the projector. The contrast control distorts the gamma curve, so the contrast you select is used to generate a new curve. The new curve will have a similar brightness for non-highlight content (below the soft-clip point). If you make large adjustment you may need to repeat the process. When done leave the contrast at 0 and hit enter.
 
 ### Adjust gamma curve
 Enables menu options to adjust the gamma curve.
