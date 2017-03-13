@@ -424,17 +424,31 @@ class GammaCurve():
         if len(newgamma) != 3:
             newgamma = [newgamma, newgamma, newgamma]
 
-        print('Picture mode:', jvc.get(Command.PictureMode).name)
-        old_gamma_table = jvc.get(Command.GammaTable)
-        print('Gamma Table:', old_gamma_table.name)
-        assert old_gamma_table in {GammaTable.Custom1,
-                                   GammaTable.Custom2,
-                                   GammaTable.Custom3}, \
-            'Selected gamma table, %s, is not a custom gamma table' % old_gamma_table.name
-        gamma_correction = jvc.get(Command.GammaCorrection)
-        assert gamma_correction is GammaCorrection.Import, \
-            'Correction value for %s is not set to import, %s' % (
-                old_gamma_table.name, gamma_correction.name)
+        try:
+            print('Picture mode:', jvc.get(Command.PictureMode).name)
+            old_gamma_table = jvc.get(Command.GammaTable)
+            print('Gamma Table:', old_gamma_table.name)
+            if old_gamma_table not in {GammaTable.Custom1,
+                                       GammaTable.Custom2,
+                                       GammaTable.Custom3}:
+                raise ValueError('Selected gamma table, {}, is not a custom gamma table'.format(
+                    old_gamma_table.name))
+            gamma_correction = jvc.get(Command.GammaCorrection)
+            if gamma_correction is not GammaCorrection.Import:
+                raise ValueError('Correction value for {} is not set to import, {}'.format(
+                    old_gamma_table.name, gamma_correction.name))
+            jvc.set(Command.GammaCorrection, GammaCorrection.Import)
+            input_level_match = input_level = jvc.get(Command.HDMIInputLevel)
+            if input_level_match is HDMIInputLevel.Auto:
+                input_level_match = HDMIInputLevel.Standard
+            if input_level_match != self.get_input_level():
+                raise ValueError('Projector input level, {}, '
+                                 'does not match gamma curve input level, {}'.format(
+                                     input_level.name, self.get_input_level().name))
+        except Exception as err:
+            print('Failed to validate projector settings:', err)
+            if not strtobool(input('Ignore and try to write table anyway (y/n)? ')):
+                raise
 
         for colorcmd, table in zip([Command.PMGammaRed, Command.PMGammaGreen, Command.PMGammaBlue],
                                    newgamma):
