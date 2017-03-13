@@ -707,7 +707,7 @@ class Menu():
                 (None, 'Setup HDR', self.setup_hdr),
                 (None, 'Set brightness and contrast for source',
                  self.set_source_brightness_contrast),
-                (None, 'Load into projetor and tune with contrast control', self.hdr_contrast_menu),
+                (None, 'Load into projector and tune with contrast control', self.hdr_contrast_menu),
                 ]
 
             self.apply_adjust_menu(menu)
