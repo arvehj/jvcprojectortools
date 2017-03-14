@@ -24,9 +24,10 @@ class Highlight(enum.Flag):
     NONE = 0
     AB = enum.auto()
     BTB = enum.auto()
+    BTBI = enum.auto()
     B = enum.auto()
     NB = enum.auto()
-    ALLB = AB | BTB | B | NB
+    ALLB = AB | BTB | BTBI | B | NB
 
     F = enum.auto()
     SC = enum.auto()
@@ -261,6 +262,7 @@ class GammaCurve():
     def generate_table(self):
         """Generate gamma table"""
         bblack = self.get_effective_bblack()
+        bblackout = self.get_effective_bblackout()
         bmax = self.get_effective_bmax()
         bsoftclip = self.get_effective_bsoftclip()
         bhardclip = self.bhardclip
@@ -271,6 +273,7 @@ class GammaCurve():
         debug = self.debug
 
         lblack = bblack / bmax
+        lblackin = bblackout / bmax
         lscale = eotf.peak / bmax * (1 - lblack)
         lsoftclip = bsoftclip / bmax
         lhardclip = math.inf if bhardclip is None else bhardclip / bmax
@@ -330,12 +333,15 @@ class GammaCurve():
         clip_gain = None
         hardclip_p = self.itop(256) #??
         last_p = None
+        pblackin = -math.inf
         for p in points:
             l = ptol(p)
             if l >= lsoftclip and clip_p is math.inf and last_p is not None and l > last_l:
                 clip_p = last_p
                 clip_l = last_l
                 clip_gain = (l ** (1 / clip_gamma) - last_l ** (1 / clip_gamma)) / (p - last_p)
+            if l < lblackin:
+                pblackin = p
             if l >= lhardclip:
                 hardclip_p = p
                 break
@@ -371,6 +377,7 @@ class GammaCurve():
             self.table = go
             return
 
+        iblackin = self.ptoi(pblackin)
         gorgb = [[], [], []]
         lastgop = None
         for gi, gop in enumerate(go):
@@ -380,6 +387,8 @@ class GammaCurve():
                 rgb = [255, 0, 0] # absolute black as dark red
             elif gi < self.irefblack and Highlight.BTB in highlight:
                 rgb = [255, 127, 0] # blacker-than-black as dark orange
+            elif gi < iblackin and Highlight.BTBI in highlight:
+                rgb = [255, 127, 0] # blacker-than-blackin as dark orange
             elif round(self.ipeakwhite) == gi and Highlight.W in highlight:
                 rgb = [0, 1023, 0] # show peak/ref white as green
             elif gi > self.ipeakwhite and Highlight.WTW in highlight:

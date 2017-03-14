@@ -383,6 +383,7 @@ class Menu():
             ('ta', 'Toggle All', Highlight.ALL, False),
             ('ba', 'AB: Absolute Black AB', Highlight.AB, False),
             ('bb', 'BTB: Blacker-than-black', Highlight.BTB, False),
+            ('bi', 'BTBI: Blacker-than-blackin', Highlight.BTBI, False),
             ('b', 'B: Black', Highlight.B, False),
             ('bn', 'NB: Near-black', Highlight.NB, False),
             ('bf', 'F: Flat spots', Highlight.F, False),
