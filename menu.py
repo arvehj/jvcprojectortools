@@ -177,7 +177,7 @@ class Menu():
     """Menu class"""
     def __init__(self):
         """JVC gamma table select, plot, load menu"""
-        self.autoplot = 0
+        self.autoplot = 2
         self.autoplot_history = 1
         self.gamma = GammaCurve()
         self.verify = True
@@ -467,7 +467,7 @@ class Menu():
 
     def autoplot_enabled(self):
         """Return if curve should be automatically  plotted after changing parameter"""
-        return self.autoplot > 0
+        return self.autoplot > 0 and self.plot is not None
 
     def autoplot_show(self):
         """Return auto plot setting to show in menu"""
@@ -486,7 +486,10 @@ class Menu():
                 autoplot = 2
         except:
             autoplot = self.autoplot + 1
-        self.autoplot = autoplot % 3
+        autoplot = autoplot % 3
+        if self.autoplot == 2 and autoplot != 2:
+            self.plot.clear()
+        self.autoplot = autoplot
         if self.autoplot == 2:
             self.replot = True
 
