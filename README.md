@@ -27,7 +27,7 @@ Enables menu options to adjust the gamma curve.
 ### Load preset gamma curve
 Select a preset gamma curve.
 - hdr pq - HDR gamma curve for content up to 4000nits
-- hdr pq 1200 - HDR gamma curve for content up to 1000nits
+- hdr pq 1200 - HDR gamma curve for content up to 1200nits
 
 ### Load gamma curve from file [confname]
 Loads a saved gamma curve from a file. If you don't specify a confname the gamma curve loaded at start-up will be used.
