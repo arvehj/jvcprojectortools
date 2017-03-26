@@ -565,59 +565,45 @@ class Menu():
 
     def clear_plot_draw_grid(self):
         """Clear plot and draw grid lines"""
-        grid_space = 28 * self.plot.scale
         unlabeled_color = 'gray97'
         vlines = [
-            (self.gamma.irefblack, 'Black'),
-            (self.gamma.ipeakwhite, 'Peak white'),
-            (self.gamma.ihardclip, 'Hard Clip'),
-            (self.gamma.isoftclip, 'Soft Clip'),
+            (self.gamma.irefblack, 'Black', 1),
+            (self.gamma.ipeakwhite, 'Peak white', 2),
+            (self.gamma.ihardclip, 'Hard Clip', 3),
+            (self.gamma.isoftclip, 'Soft Clip', 4),
             ]
-        vlines += [(round(self.gamma.ptoi((i / 4 - 16) / (235 - 16)) * 4) / 4, '')
+        vlines += [(round(self.gamma.ptoi((i / 4 - 16) / (235 - 16)) * 4) / 4, '', 0)
                    for i in range(0, 1023, max(1, round(4 * 16 * self.plot.scale)))]
         vlines.sort()
 
         hlines = [
-            (self.gamma.get_effective_bmax(), ''),
-            (self.gamma.get_effective_bblackout(), 'Black Out\n'),
-            (self.gamma.get_effective_bsoftclip(), 'Soft Clip\n'),
+            (self.gamma.get_effective_bmax(), '', 1),
+            (self.gamma.get_effective_bblackout(), 'Black Out\n', 2),
+            (self.gamma.get_effective_bsoftclip(), 'Soft Clip\n', 3),
             ]
-        hlines += [(round(b, -int(math.floor(math.log10(b)))), '')
+        hlines += [(round(b, -int(math.floor(math.log10(b)))), '', 0)
                    for b in [10 ** (i / 3) for i in range(-12, 14)]]
         hlines.sort()
 
         lines = []
-        last_i = -math.inf
-        last_i_count = None
-        last_i_name = None
-        for i, name in vlines:
+        for i, name, priority in vlines:
             if i < 0:
                 continue
-            if i - last_i > grid_space or (name and not last_i_name):
-                if i - last_i <= grid_space:
-                    line = (last_i, False, None)
-                    if not last_i_name:
-                        line = line + (unlabeled_color,)
-                    lines[last_i_count] = line
-                line = (i, False, '{}\n{:.5g}/{:.5g}/{:.5g}\n{}'.format(
+            line = {
+                'pos': i,
+                'horizontal': False,
+                'label': '{}\n{:.5g}/{:.5g}/{:.5g}\n{}'.format(
                     name,
                     i, 16 + self.gamma.itop(i) * (235 - 16),
                     16 * 4 + self.gamma.itop(i) * (235 - 16) * 4,
-                    self.itostr(i)))
-                last_i = i
-                last_i_name = name
-                last_i_count = len(lines)
-            else:
-                line = (i, False, None)
+                    self.itostr(i)),
+                'priority': priority,
+                }
             if not name:
-                line = line + (unlabeled_color,)
+                line['color'] = unlabeled_color
             lines.append(line)
 
-        grid_space *= 4
-        last_o = -math.inf
-        last_o_count = None
-        last_o_name = None
-        for b, name in hlines:
+        for b, name, priority in hlines:
             try:
                 if b <= 0:
                     continue
@@ -626,21 +612,15 @@ class Menu():
             except ValueError:
                 continue
 
-            if o - last_o > grid_space or (name and not last_o_name):
-                if o - last_o <= grid_space:
-                    line = (last_o, True, None)
-                    if not last_o_name:
-                        line = line + (unlabeled_color,)
-                    lines[last_o_count] = line
-                line = (o, True, '{}{:.5g} cd/m²\nvirt {:.3g} cd/m²\no: {:.4g}'.format(
-                    name, self.gamma.bi_to_bo(b), b, o))
-                last_o = o
-                last_o_name = name
-                last_o_count = len(lines)
-            else:
-                line = (o, True, None)
+            line = {
+                'pos': o,
+                'horizontal': True,
+                'label': '{}{:.5g} cd/m²\nvirt {:.3g} cd/m²\no: {:.4g}'.format(
+                    name, self.gamma.bi_to_bo(b), b, o),
+                'priority': priority,
+                }
             if not name:
-                line = line + (unlabeled_color,)
+                line['color'] = unlabeled_color
             lines.append(line)
 
         self.plot.clear(lines=lines)
