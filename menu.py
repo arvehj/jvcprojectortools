@@ -3,6 +3,8 @@
 """JVC projector tool menu"""
 
 import math
+import sys
+import threading
 import traceback
 from distutils.util import strtobool
 
@@ -159,6 +161,8 @@ def run_menu_item(name, func, arg):
             try:
                 func(arg)
                 return None
+            except plot.PlotClosed:
+                return None
             except Exception as err:
                 print(name, 'failed', err)
 
@@ -173,6 +177,28 @@ def run_menu_item(name, func, arg):
         print('Interrupted', err)
         return err
 
+class ExceptionInThread(Exception):
+    """Exception info from thread"""
+    pass
+
+class MenuThread(threading.Thread):
+    """Menu Thread class"""
+    def __init__(self, menu):
+        threading.Thread.__init__(self)
+        self.exception = None
+        self.menu = menu
+
+    def run(self):
+        try:
+            self.menu.run()
+        except BaseException as err:
+            self.exception = ExceptionInThread(err, sys.exc_info())
+        finally:
+            try:
+                self.menu.plot.close()
+            except:
+                pass
+
 class Menu():
     """Menu class"""
     def __init__(self):
@@ -182,6 +208,7 @@ class Menu():
         self.gamma = GammaCurve()
         self.verify = True
         self.plot = None
+        self.run_plot_open = False
         self.plot_menu = False
         self.replot = False
         self.adjust_menu_on = False
@@ -194,7 +221,27 @@ class Menu():
             if not strtobool(input('Failed to load gamma curve.\n'
                                    'Ignore error and continue (y/n)? ')):
                 raise
-        self.run()
+
+        while self.run_plot_open is not None:
+            plot_open = self.run_plot_open
+            self.run_plot_open = None
+            if plot_open:
+                self.run_with_plot()
+            else:
+                self.run()
+
+    def run_with_plot(self):
+        """Open plot window and run menu in thread"""
+        thread = MenuThread(self)
+        self.plot = plot.Plot()
+        try:
+            thread.start()
+            self.plot.run()
+        finally:
+            thread.join()
+            self.plot = None
+            if thread.exception is not None:
+                raise thread.exception
 
     def load(self, basename):
         """Load gamma curve from file"""
@@ -540,7 +587,8 @@ class Menu():
         """Toggle plot menu"""
         self.plot_menu = not self.plot_menu
         if self.plot_menu and self.plot is None:
-            self.plot = plot.Plot()
+            self.run_plot_open = True
+            self.replot = True
 
     def apply_plot_menu(self, menu):
         """Add plot menu entries to menu"""
@@ -687,6 +735,16 @@ class Menu():
         gammahist = []
 
         while True:
+            if self.plot and self.plot.closed:
+                self.plot_menu = False
+                self.run_plot_open = False
+                print('Plot window closed')
+
+            if self.run_plot_open is not None:
+                return
+
+            self.run_autoplot(gammahist)
+
             menu = [
                 (None, 'Setup HDR', self.setup_hdr),
                 (None, 'Set brightness and contrast for source',
@@ -721,24 +779,33 @@ class Menu():
                     if val is not None:
                         self.gamma.set(sel[3], val)
                         self.replot = True
-            if self.autoplot_enabled():
-                while len(gammahist) > self.autoplot_history + 1:
+
+    def run_autoplot(self, gammahist):
+        """Perform Auto Plot if enabled"""
+        if not self.autoplot_enabled():
+            return
+
+        while len(gammahist) > self.autoplot_history + 1:
+            gammahist.pop(0)
+
+        table = self.gamma.get_table()
+        if len(gammahist) == 0 or table != gammahist[-1] or self.replot:
+            self.replot = False
+            if len(gammahist) == 0 or table != gammahist[-1]:
+                while len(gammahist) > self.autoplot_history:
                     gammahist.pop(0)
-                table = self.gamma.get_table()
-                if len(gammahist) == 0 or table != gammahist[-1] or self.replot:
-                    self.replot = False
-                    if len(gammahist) == 0 or table != gammahist[-1]:
-                        while len(gammahist) > self.autoplot_history:
-                            gammahist.pop(0)
-                    if self.autoplot_clear_enabled():
-                        self.clear_plot_draw_grid()
-                        for rtable in self.gammaref:
-                            self.plot.plot(rtable, colors=['gray50'], draw_speed=1024)
-                        for htable in gammahist:
-                            self.plot.plot(htable, colors=['gray70'], draw_speed=1024)
-                    if len(gammahist) == 0 or table != gammahist[-1]:
-                        gammahist.append(table)
-                    self.plot.plot(table, draw_speed=256)
+            try:
+                if self.autoplot_clear_enabled():
+                    self.clear_plot_draw_grid()
+                    for rtable in self.gammaref:
+                        self.plot.plot(rtable, colors=['gray50'], draw_speed=1024)
+                    for htable in gammahist:
+                        self.plot.plot(htable, colors=['gray70'], draw_speed=1024)
+                if len(gammahist) == 0 or table != gammahist[-1]:
+                    gammahist.append(table)
+                self.plot.plot(table, draw_speed=256)
+            except plot.PlotClosed:
+                pass
 
 def main():
     """JVC Projector tools main menu"""
@@ -747,10 +814,14 @@ def main():
             Menu()
             break
         except Exception as err:
+            if isinstance(err, ExceptionInThread):
+                err, exc = err.args
+            else:
+                exc = sys.exc_info()
             print(err)
             try:
                 if strtobool(input('error occured print stack trace? ')):
-                    traceback.print_exc()
+                    traceback.print_exception(*exc)
             except:
                 pass
             try:

@@ -4,31 +4,146 @@
 
 import math
 import numbers
+import queue
+import threading
 import turtle
 from tkinter.font import Font
 
-class Plot:
+class PlotClosed(Exception):
+    """Exception to signal that the plot window has been closed"""
+    pass
+
+class Plot():
     """Class to plot gamma gamma curves and keep track of zoom level"""
-    def __init__(self, lines=()):
+    def __init__(self):
+        self.queue = queue.Queue(maxsize=1)
         self.margin = [0, 0, 0, 0]
         self.plot_area = (0, 0, 255, 1023)
         self.min_size = (2, 8)
         self.zoom_area = [*self.plot_area]
+        self.scale = 1
         self.font = ('Ariel', 8)
-        self.zoom()
-        self.draw_grid(lines=lines)
+        self.closed = False
+        self.window_size = None
+        self.tables = []
+        try:
+            turtle.setup()
+        except turtle.Terminator:
+            turtle.setup()
 
     def clear(self, lines=()):
+        """Queue clear command"""
+        self.enqueue(lambda: self.do_clear(lines))
+
+    def zoom(self, level=None, direction=(0, 0)):
+        """Queue zoom in or out command"""
+        self.enqueue(lambda: self.do_zoom(level, direction))
+
+    def plot(self, *gamma, colors=['red', 'green', 'blue'], draw_speed=16, scale_x=1):
+        """Queue plot gamma table command"""
+        self.enqueue(lambda: self.do_plot(*gamma, colors=colors, draw_speed=draw_speed,
+                                          scale_x=scale_x))
+
+    def close(self):
+        """Queue close command"""
+        try:
+            self.enqueue(self.do_close)
+        except PlotClosed:
+            pass
+
+    def enqueue(self, func):
+        """Queue command"""
+        retry_count = 0
+        while True:
+            try:
+                if self.closed:
+                    raise PlotClosed('Plot window closed')
+                self.queue.put(func, timeout=1)
+                return
+            except queue.Full:
+                retry_count += 1
+                if retry_count % 10 == 0:
+                    print('queue full, waiting', retry_count)
+
+    def run(self):
+        """Process command queue and enter turtle main loop"""
+        if self.closed:
+            raise PlotClosed('Plot window closed')
+        opened = False
+        try:
+            while True:
+                try:
+                    cmd = self.queue.get(timeout=1)
+                    break
+                except queue.Empty:
+                    pass
+            if cmd != self.do_close:
+                opened = True
+                self.do_zoom()
+                self.do_clear()
+                cmd()
+                turtle.ontimer(self.check_queue, 100)
+                turtle.mainloop()
+        except turtle.Terminator:
+            pass
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.closed = True
+            if opened:
+                try:
+                    turtle.bye()
+                except turtle.Terminator:
+                    pass
+
+    def check_queue(self):
+        """Timer callback to check command queue"""
+        try:
+            while True:
+                window_size = turtle.window_width(), turtle.window_height()
+                if self.window_size != window_size:
+                    self.redraw()
+                    turtle.ontimer(self.check_queue, 200)
+                    break
+                cmd = self.queue.get_nowait()
+                cmd()
+                if cmd == self.do_close:
+                    break
+        except queue.Empty:
+            turtle.ontimer(self.check_queue, 100)
+        except turtle.Terminator:
+            pass
+        except KeyboardInterrupt:
+            turtle.bye()
+
+    def do_close(self):
+        """Close window"""
+        turtle.bye()
+
+    def do_clear(self, lines=()):
         """Clear plot and draw grid lines"""
         turtle.clear()
-        self.draw_grid(lines=lines)
+        self.tables = []
+        self.lines = lines
+        self.draw_grid()
+
+    def redraw(self):
+        """Clear plot and draw grid lines"""
+        turtle.clear()
+        self.setworldcoordinates()
+        self.draw_grid()
+        for tables, kwargs in self.tables:
+            self.plot_table(*tables, draw_speed=1024, **kwargs)
 
     def setworldcoordinates(self):
         """Update window after zoom or margin change"""
+        self.window_size = turtle.window_width(), turtle.window_height()
+        turtle.screensize(1, 1)
+        turtle.update()
         turtle.setworldcoordinates(*(a + b * self.scale
                                      for a, b in zip(self.zoom_area, self.margin)))
 
-    def zoom(self, level=None, direction=(0, 0)):
+    def do_zoom(self, level=None, direction=(0, 0)):
         """Zoom in or out"""
         self.scale = 1
         if level is None:
@@ -108,7 +223,7 @@ class Plot:
                            pos if horizontal else self.plot_area[3])
         turtle.penup()
 
-    def draw_grid(self, lines=()):
+    def draw_grid(self):
         """Draw grid lines"""
         turtle.tracer(0)
         turtle.hideturtle()
@@ -124,7 +239,7 @@ class Plot:
         turtle.penup()
         turtle.color('gray90')
 
-        lines = [line.copy() for line in lines]
+        lines = [line.copy() for line in self.lines]
         lines.sort(key=lambda x: x['pos'])
         last = [None, None]
         last_pos = [-math.inf, -math.inf]
@@ -191,9 +306,13 @@ class Plot:
                 self.draw_line(**line)
         turtle.update()
 
-    def plot(self, *gamma, colors=['red', 'green', 'blue'], draw_speed=16, scale_x=1):
+    def do_plot(self, *gamma, draw_speed=16, **kwargs):
         """Plot gamma table"""
+        self.tables.append((gamma, kwargs))
+        self.plot_table(*gamma, draw_speed=draw_speed, **kwargs)
 
+    def plot_table(self, *gamma, colors=['red', 'green', 'blue'], draw_speed=16, scale_x=1):
+        """Plot gamma table"""
         if len(gamma) == 1 and len(gamma[0]) == 3:
             gamma = gamma[0]
         if all(x == gamma[0] for x in gamma):
@@ -223,40 +342,56 @@ class Plot:
             turtle.hideturtle()
             turtle.update()
 
+class Test(threading.Thread):
+    """Test Plot class"""
+    def __init__(self, plot):
+        threading.Thread.__init__(self)
+        self.plot = plot
+        self.start()
+
+    def run(self):
+        """Test Plot class client thread"""
+        p = self.plot
+        try:
+            p.plot([512 for i in range(256)], draw_speed=4)
+            p.clear(lines=
+                    [{'pos': i, 'label': str(i)} for i in list(range(16, 256-15, 16)) + [255]] +
+                    [{'pos': i, 'horizontal': True, 'label': str(i)}
+                     for i in range(64, 1024-63, 64)])
+            p.plot([512 for i in range(256)], draw_speed=4)
+            p.clear(lines=[{'pos': 128, 'label': 'Green line\nlabel', 'color': 'green'},
+                           {'pos': 136, 'label': 'Blue\nline\nlabel', 'priority': 1,
+                            'color': 'blue'}])
+            p.plot([512 for i in range(256)], draw_speed=4)
+            p.zoom(4, (0, -1))
+            p.clear(lines=[{'pos': 128, 'label': 'Green line\nlabel', 'color': 'green'},
+                           {'pos': 136, 'label': 'Blue\nline\nlabel', 'color': 'blue'}])
+            p.plot([512 for i in range(256)], draw_speed=4)
+            p.clear()
+            p.zoom()
+            p.plot([512 for i in range(256)], draw_speed=4)
+            p.clear(lines=[{'pos': i} for i in range(256)])
+            p.plot([512 for i in range(256)], draw_speed=2)
+            p.clear(lines=[{'pos': 127}, {'pos':128}])
+            p.plot([i << 2 | i >> 6 for i in range(256)])
+            p.plot([i << 2 | i >> 6 for i in range(255, -1, -1)], colors=['red'])
+            p.zoom(4, (0, 0))
+            p.plot([i << 2 | i >> 6 for i in range(256)], draw_speed=2, colors=['green'])
+            p.zoom(2, (-1, 0))
+            p.plot([i << 2 | i >> 6 for i in range(256)], draw_speed=2, colors=['green'])
+            p.zoom()
+            p.enqueue(lambda: turtle.setpos(100, 512))
+            p.enqueue(lambda: turtle.write('test done'))
+            print('test done')
+        except PlotClosed as err:
+            print(err)
+
 def main():
     """Test Plot class"""
     p = Plot()
-    p.plot([512 for i in range(256)], draw_speed=4)
-    p.clear(lines=
-            [{'pos': i, 'label': str(i)} for i in list(range(16, 256-15, 16)) + [255]] +
-            [{'pos': i, 'horizontal': True, 'label': str(i)}
-             for i in range(64, 1024-63, 64)])
-    p.plot([512 for i in range(256)], draw_speed=4)
-    p.clear(lines=[{'pos': 128, 'label': 'Green line\nlabel', 'color': 'green'},
-                   {'pos': 136, 'label': 'Blue\nline\nlabel', 'priority': 1,
-                    'color': 'blue'}])
-    p.plot([512 for i in range(256)], draw_speed=4)
-    p.zoom(4, (0, -1))
-    p.clear(lines=[{'pos': 128, 'label': 'Green line\nlabel', 'color': 'green'},
-                   {'pos': 136, 'label': 'Blue\nline\nlabel', 'color': 'blue'}])
-    p.plot([512 for i in range(256)], draw_speed=4)
-    p.clear()
-    p.zoom()
-    p.plot([512 for i in range(256)], draw_speed=4)
-    p.clear(lines=[{'pos': i} for i in range(256)])
-    p.plot([512 for i in range(256)], draw_speed=2)
-    p.clear(lines=[{'pos': 127}, {'pos':128}])
-    p.plot([i << 2 | i >> 6 for i in range(256)])
-    p.plot([i << 2 | i >> 6 for i in range(255, -1, -1)], colors=['red'])
-    p.zoom(4, (0, 0))
-    p.plot([i << 2 | i >> 6 for i in range(256)], draw_speed=2, colors=['green'])
-    p.zoom(2, (-1, 0))
-    p.plot([i << 2 | i >> 6 for i in range(256)], draw_speed=2, colors=['green'])
-    p.zoom()
-    turtle.setpos(100, 512)
-    turtle.write('test done')
-    turtle.update()
-    turtle.exitonclick()
+    test = Test(p)
+    p.run()
+    test.join()
 
 if __name__ == "__main__":
     main()
