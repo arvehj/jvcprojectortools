@@ -3,10 +3,13 @@
 """JVC projector tool menu"""
 
 import math
+import os
 import sys
 import threading
 import traceback
 from distutils.util import strtobool
+
+sys.path.append(os.path.dirname(__file__))
 
 import eotf
 import plot
