@@ -3,6 +3,7 @@
 """JVC projector tool menu"""
 
 import math
+import re
 import sys
 import threading
 import traceback
@@ -242,6 +243,27 @@ class Menu():
             self.plot = None
             if thread.exception is not None:
                 raise thread.exception
+
+    def import_vcgt(self, basename):
+        """Import gamma curve from VCGT file"""
+        with open(input('VCGT file to load: '), 'r') as fh:
+            p = re.compile(r'\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)')
+            gamma_red = []
+            gamma_green = []
+            gamma_blue = []
+            line = fh.readline()
+            while line:
+                m = p.match(line)
+                if m is not None:
+                    gamma_red.append(int(m.group(2)) >> 6)
+                    gamma_green.append(int(m.group(3)) >> 6)
+                    gamma_blue.append(int(m.group(4)) >> 6)
+                line = fh.readline()
+            if len(gamma_red) == 256 and len(gamma_green) == 256 and len(gamma_blue) == 256:
+                print('SUCCESS: imported 256 gamma table entries\n')
+                self.gamma.set_raw_table((gamma_red, gamma_green, gamma_blue))
+            else:
+                print('ERROR: not a valid VCGT input file\n')
 
     def load(self, basename):
         """Load gamma curve from file"""
@@ -756,6 +778,7 @@ class Menu():
 
             menu += [
                 ('lp', 'Load preset gamma curve', self.preset_gamma_menu_select),
+                ('ig', 'Import gamma curve from VCGT file', self.import_vcgt),
                 ('lf', 'Load gamma curve from file [confname]', self.load),
                 ('Pw', 'Write gamma curve to projector',
                  lambda _: self.gamma.write(verify=self.verify)),
