@@ -244,9 +244,9 @@ class Menu():
             if thread.exception is not None:
                 raise thread.exception
 
-    def import_vcgt(self, basename):
+    def import_vcgt(self, filename):
         """Import gamma curve from VCGT file"""
-        with open(input('VCGT file to load: '), 'r') as fh:
+        with open(filename), 'r') as fh:
             p = re.compile(r'\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)')
             gamma_red = []
             gamma_green = []
@@ -778,7 +778,7 @@ class Menu():
 
             menu += [
                 ('lp', 'Load preset gamma curve', self.preset_gamma_menu_select),
-                ('ig', 'Import gamma curve from VCGT file', self.import_vcgt),
+                ('ig', 'Import gamma curve from VCGT file [filename]', self.import_vcgt),
                 ('lf', 'Load gamma curve from file [confname]', self.load),
                 ('Pw', 'Write gamma curve to projector',
                  lambda _: self.gamma.write(verify=self.verify)),
