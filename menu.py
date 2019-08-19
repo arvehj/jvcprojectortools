@@ -246,7 +246,7 @@ class Menu():
 
     def import_vcgt(self, filename):
         """Import gamma curve from VCGT file"""
-        with open(filename), 'r') as fh:
+        with open(filename, 'r') as fh:
             p = re.compile(r'\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)')
             gamma_red = []
             gamma_green = []
