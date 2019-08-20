@@ -750,6 +750,7 @@ class Menu():
             ('bwc', 'Scale ref white brightness from contrast (-50 - 50)',
              self.contrast_to_brefwhite),
             ('Pr', 'Read raw table from projector', lambda _: self.gamma.read()),
+            ('ig', 'Import gamma curve from VCGT file [filename]', self.import_vcgt),
             ]
 
     def run(self):
@@ -778,7 +779,6 @@ class Menu():
 
             menu += [
                 ('lp', 'Load preset gamma curve', self.preset_gamma_menu_select),
-                ('ig', 'Import gamma curve from VCGT file [filename]', self.import_vcgt),
                 ('lf', 'Load gamma curve from file [confname]', self.load),
                 ('Pw', 'Write gamma curve to projector',
                  lambda _: self.gamma.write(verify=self.verify)),
